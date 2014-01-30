@@ -12,13 +12,13 @@
 	</parent>
 	
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.usergrid</groupId>
+	<groupId>org.apache.usergrid</groupId>
 	<artifactId>usergrid-android-client</artifactId>
 	<version>0.0.7-SNAPSHOT</version>
 	
 	<packaging>jar</packaging>
-	<description>A simple java client for usergrid</description>
-	<url>https://github.com/apigee/usergrid-stack-internal</url>
+	<description>A simple android client for Apache Usergrid</description>
+	<url>https://github.com/usergrid/usergrid</url>
 	
 	<licenses>
 		<license>
@@ -42,11 +42,6 @@
 			<name>Scott Ganyo</name>
 		</developer>
 	</developers>
-	<scm>
-		<connection>scm:git:git@github.com:apigee/usergrid-android-sdk.git</connection>
-		<developerConnection>scm:git:git@github.com:apigee/usergrid-android-sdk.git</developerConnection>
-		<url>git@github.com:apigee/usergrid-android-sdk.git</url>
-	</scm>
 	
 	<dependencies>
 		<dependency>

@@ -9,7 +9,7 @@
     <relativePath></relativePath>
   </parent>
 
-  <groupId>org.usergrid</groupId>
+  <groupId>org.apache.usergrid</groupId>
   <artifactId>usergrid</artifactId>
   <version>0.0.28-SNAPSHOT</version>
   <name>Usergrid Parent</name>
@@ -1256,7 +1256,7 @@
       </dependency>
 
       <dependency>
-        <groupId>org.usergrid</groupId>
+        <groupId>org.apache.usergrid</groupId>
         <artifactId>usergrid-java-client</artifactId>
         <version>0.0.3</version>
       </dependency>

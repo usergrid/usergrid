@@ -1,8 +1,7 @@
 
-Usergrid Android Client
+Apache Usergrid Java Client
 
-Experimental Android client for Usergrid. Basically uses Spring Android and
-Jackson to wrap calls to Usergrid REST API. Loosely based on the Usergrid
+Experimental Java client for Apache Usergrid. Loosely based on the Usergrid
 Javascript client.
 
 Requires the following permissions:

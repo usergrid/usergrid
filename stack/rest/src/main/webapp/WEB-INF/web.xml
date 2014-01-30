@@ -21,7 +21,7 @@
 
   <filter>
     <filter-name>swaggerFilter</filter-name>
-    <filter-class>org.usergrid.rest.SwaggerServlet</filter-class>
+    <filter-class>org.apache.usergrid.rest.SwaggerServlet</filter-class>
   </filter>
 
   <filter-mapping>
@@ -40,7 +40,7 @@
   <!--  filter for setting default accept and Content-Type as application/json when undefined by client -->
   <filter>
     <filter-name>contentTypeFilter</filter-name>
-    <filter-class>org.usergrid.rest.filters.ContentTypeFilter</filter-class>
+    <filter-class>org.apache.usergrid.rest.filters.ContentTypeFilter</filter-class>
   </filter>
   <filter-mapping>
     <filter-name>contentTypeFilter</filter-name>
@@ -65,7 +65,7 @@
     <filter-class>com.sun.jersey.spi.spring.container.servlet.SpringServlet</filter-class>
     <init-param>
       <param-name>com.sun.jersey.config.property.packages</param-name>
-      <param-value>org.usergrid.rest</param-value>
+      <param-value>org.apache.usergrid.rest</param-value>
     </init-param>
     <init-param>
       <param-name>com.sun.jersey.api.json.POJOMappingFeature</param-name>
@@ -73,15 +73,15 @@
     </init-param>
     <init-param>
       <param-name>com.sun.jersey.spi.container.ContainerRequestFilters</param-name>
-      <param-value>org.usergrid.rest.filters.TracingFilter,org.usergrid.rest.filters.MeteringFilter,org.usergrid.rest.filters.JSONPCallbackFilter,org.usergrid.rest.security.shiro.filters.OAuth2AccessTokenSecurityFilter,org.usergrid.rest.security.shiro.filters.BasicAuthSecurityFilter,org.usergrid.rest.security.shiro.filters.ClientCredentialsSecurityFilter</param-value>
+      <param-value>org.apache.usergrid.rest.filters.TracingFilter,org.apache.usergrid.rest.filters.MeteringFilter,org.apache.usergrid.rest.filters.JSONPCallbackFilter,org.apache.usergrid.rest.security.shiro.filters.OAuth2AccessTokenSecurityFilter,org.apache.usergrid.rest.security.shiro.filters.BasicAuthSecurityFilter,org.apache.usergrid.rest.security.shiro.filters.ClientCredentialsSecurityFilter</param-value>
     </init-param>
     <init-param>
       <param-name>com.sun.jersey.spi.container.ContainerResponseFilters</param-name>
-      <param-value>org.usergrid.rest.filters.TracingFilter,org.usergrid.rest.security.CrossOriginRequestFilter,org.usergrid.rest.filters.MeteringFilter</param-value>
+      <param-value>org.apache.usergrid.rest.filters.TracingFilter,org.apache.usergrid.rest.security.CrossOriginRequestFilter,org.apache.usergrid.rest.filters.MeteringFilter</param-value>
     </init-param>
     <init-param>
       <param-name>com.sun.jersey.spi.container.ResourceFilters</param-name>
-      <param-value>org.usergrid.rest.security.SecuredResourceFilterFactory,com.sun.jersey.api.container.filter.RolesAllowedResourceFilterFactory</param-value>
+      <param-value>org.apache.usergrid.rest.security.SecuredResourceFilterFactory,com.sun.jersey.api.container.filter.RolesAllowedResourceFilterFactory</param-value>
     </init-param>
     <init-param>
       <param-name>com.sun.jersey.config.feature.DisableWADL</param-name>
