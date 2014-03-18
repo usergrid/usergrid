@@ -21,11 +21,7 @@ import java.util.Map;
 
 import org.apache.usergrid.management.ManagementService;
 import org.apache.usergrid.persistence.EntityManager;
-
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.config.ClientConfig;
-import com.sun.jersey.api.client.config.DefaultClientConfig;
-import com.sun.jersey.api.json.JSONConfiguration;
+import org.springframework.web.client.RestTemplate;
 
 
 /** @author zznate */
@@ -33,15 +29,13 @@ public abstract class AbstractProvider implements SignInAsProvider {
 
     protected EntityManager entityManager;
     protected ManagementService managementService;
-    protected Client client;
+    protected RestTemplate restTemplate;
 
 
-    AbstractProvider( EntityManager entityManager, ManagementService managementService ) {
+    AbstractProvider( EntityManager entityManager, ManagementService managementService, RestTemplate restTemplate) {
         this.entityManager = entityManager;
         this.managementService = managementService;
-        ClientConfig clientConfig = new DefaultClientConfig();
-        clientConfig.getFeatures().put( JSONConfiguration.FEATURE_POJO_MAPPING, Boolean.TRUE );
-        client = Client.create( clientConfig );
+        this.restTemplate = restTemplate;
     }
 
 

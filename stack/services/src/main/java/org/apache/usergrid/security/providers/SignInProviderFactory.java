@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.apache.usergrid.management.ManagementService;
 import org.apache.usergrid.persistence.EntityManagerFactory;
 import org.apache.usergrid.persistence.entities.Application;
+import org.springframework.web.client.RestTemplate;
 
 
 /** @author zznate */
@@ -28,23 +29,24 @@ public class SignInProviderFactory {
 
     private EntityManagerFactory emf;
     private ManagementService managementService;
-
+    private RestTemplate restTemplate;
 
     @Autowired
     public void setEntityManagerFactory( EntityManagerFactory emf ) {
         this.emf = emf;
     }
 
-
     @Autowired
     public void setManagementService( ManagementService managementService ) {
         this.managementService = managementService;
     }
 
+    @Autowired
+    public void setRestTemplate(RestTemplate restTemplate) { this.restTemplate = restTemplate; }
 
     public SignInAsProvider facebook( Application application ) {
         FacebookProvider facebookProvider =
-                new FacebookProvider( emf.getEntityManager( application.getUuid() ), managementService );
+                new FacebookProvider( emf.getEntityManager( application.getUuid() ), managementService, restTemplate );
         facebookProvider.configure();
         return facebookProvider;
     }
@@ -52,7 +54,7 @@ public class SignInProviderFactory {
 
     public SignInAsProvider foursquare( Application application ) {
         FoursquareProvider foursquareProvider =
-                new FoursquareProvider( emf.getEntityManager( application.getUuid() ), managementService );
+                new FoursquareProvider( emf.getEntityManager( application.getUuid() ), managementService, restTemplate );
         foursquareProvider.configure();
         return foursquareProvider;
     }
@@ -60,7 +62,7 @@ public class SignInProviderFactory {
 
     public SignInAsProvider pingident( Application application ) {
         PingIdentityProvider pingIdentityProvider =
-                new PingIdentityProvider( emf.getEntityManager( application.getUuid() ), managementService );
+                new PingIdentityProvider( emf.getEntityManager( application.getUuid() ), managementService, restTemplate );
         pingIdentityProvider.configure();
         return pingIdentityProvider;
     }

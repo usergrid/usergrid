@@ -23,6 +23,10 @@ import java.util.Map;
 
 import javax.ws.rs.core.MediaType;
 
+import com.sun.jersey.api.client.Client;
+import com.sun.jersey.api.client.config.ClientConfig;
+import com.sun.jersey.api.client.config.DefaultClientConfig;
+import com.sun.jersey.api.json.JSONConfiguration;
 import org.codehaus.jackson.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +35,7 @@ import org.apache.usergrid.persistence.EntityManager;
 import org.apache.usergrid.persistence.Identifier;
 import org.apache.usergrid.persistence.entities.User;
 import org.apache.usergrid.security.tokens.exceptions.BadTokenException;
+import org.springframework.web.client.RestTemplate;
 
 
 /**
@@ -47,8 +52,8 @@ public class PingIdentityProvider extends AbstractProvider {
     private String clientSecret;
 
 
-    PingIdentityProvider( EntityManager entityManager, ManagementService managementService ) {
-        super( entityManager, managementService );
+    PingIdentityProvider( EntityManager entityManager, ManagementService managementService, RestTemplate restTemplate ) {
+        super( entityManager, managementService, restTemplate );
     }
 
 
@@ -121,7 +126,9 @@ public class PingIdentityProvider extends AbstractProvider {
 
     @Override
     Map<String, Object> userFromResource( String externalToken ) {
-
+        ClientConfig clientConfig = new DefaultClientConfig();
+        clientConfig.getFeatures().put( JSONConfiguration.FEATURE_POJO_MAPPING, Boolean.TRUE );
+        Client client = Client.create(clientConfig);
         JsonNode node = client.resource( apiUrl )
                               .queryParam( "grant_type", "urn:pingidentity.com:oauth2:grant_type:validate_bearer" )
                               .queryParam( "client_secret", clientSecret ).queryParam( "client_id", clientId )
