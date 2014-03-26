@@ -16,79 +16,102 @@
     limitations under the License.
 -->
 <beans xmlns="http://www.springframework.org/schema/beans"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
-	xmlns:context="http://www.springframework.org/schema/context" xmlns:p="http://www.springframework.org/schema/p"
-	xsi:schemaLocation="
-	http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
-	http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.1.xsd
-	http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd">
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
+       xmlns:context="http://www.springframework.org/schema/context" xmlns:p="http://www.springframework.org/schema/p"
+       xsi:schemaLocation="
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd">
 
-	<context:component-scan base-package="org.apache.usergrid.services"  />
-	
-	
-	<import resource="classpath:/usergrid-core-context.xml" />
-
-	<!--  scan for security -->
-	<context:component-scan base-package="org.apache.usergrid.security.crypto"  />
-
-	<bean id="realm" class="org.apache.usergrid.security.shiro.Realm">
-		<property name="name" value="realm" />
-	</bean>
-
-	<bean id="securityManager" class="org.apache.shiro.mgt.DefaultSecurityManager">
-		<property name="realm" ref="realm" />
-	</bean>
-
-	<bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor" />
-
-	<bean
-		class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
-		<property name="staticMethod"
-			value="org.apache.shiro.SecurityUtils.setSecurityManager" />
-		<property name="arguments" ref="securityManager" />
-	</bean>
+    <context:component-scan base-package="org.apache.usergrid.services"  />
 
 
-	<bean id="taskExecutor" class="org.springframework.core.task.SyncTaskExecutor"/>
+    <import resource="classpath:/usergrid-core-context.xml" />
 
-	<bean id="tokenService" class="org.apache.usergrid.security.tokens.cassandra.TokenServiceImpl">
+    <!--  scan for security -->
+    <context:component-scan base-package="org.apache.usergrid.security.crypto"  />
+
+    <bean id="realm" class="org.apache.usergrid.security.shiro.Realm">
+        <property name="name" value="realm" />
+    </bean>
+
+    <bean id="securityManager" class="org.apache.shiro.mgt.DefaultSecurityManager">
+        <property name="realm" ref="realm" />
+    </bean>
+
+    <bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor" />
+
+    <bean
+            class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+        <property name="staticMethod"
+                  value="org.apache.shiro.SecurityUtils.setSecurityManager" />
+        <property name="arguments" ref="securityManager" />
+    </bean>
+
+
+    <bean id="taskExecutor" class="org.springframework.core.task.SyncTaskExecutor"/>
+
+    <bean id="tokenService" class="org.apache.usergrid.security.tokens.cassandra.TokenServiceImpl">
         <property name="cassandraService" ref="cassandraService"/>
         <property name="entityManagerFactory" ref="entityManagerFactory"/>
-            </bean>
+    </bean>
 
-	<bean id="managementService" class="org.apache.usergrid.management.cassandra.ManagementServiceImpl" >
-		<property name="saltProvider" ref="saltProvider"/>
-	</bean>
-	
-	<bean id="saltProvider" class="org.apache.usergrid.security.salt.NoOpSaltProvider" />
+    <bean id="managementService" class="org.apache.usergrid.management.cassandra.ManagementServiceImpl" >
+        <property name="saltProvider" ref="saltProvider"/>
+    </bean>
 
-	<bean id="serviceManagerFactory" class="org.apache.usergrid.services.ServiceManagerFactory">
-		<constructor-arg ref="entityManagerFactory" />
-		<constructor-arg ref="properties" />
-		<constructor-arg ref="schedulerService"/>
+    <bean id="saltProvider" class="org.apache.usergrid.security.salt.NoOpSaltProvider" />
+
+    <bean id="serviceManagerFactory" class="org.apache.usergrid.services.ServiceManagerFactory">
+        <constructor-arg ref="entityManagerFactory" />
+        <constructor-arg ref="properties" />
+        <constructor-arg ref="schedulerService"/>
         <constructor-arg ref="lockManager"/>
         <constructor-arg ref="queueManagerFactory"/>
-	</bean>
+    </bean>
 
-	<bean id="applicationCreator"
-		class="org.apache.usergrid.management.cassandra.ApplicationCreatorImpl">
-		<constructor-arg ref="entityManagerFactory" />
-		<constructor-arg ref="managementService" />
-	</bean>
+    <bean id="applicationCreator"
+          class="org.apache.usergrid.management.cassandra.ApplicationCreatorImpl">
+        <constructor-arg ref="entityManagerFactory" />
+        <constructor-arg ref="managementService" />
+    </bean>
+
+    <bean id="requestConfigBuilder" class="org.apache.http.client.config.RequestConfig" factory-method="custom">
+        <property name="socketTimeout" value="3000" />
+        <property name="connectTimeout" value="3000" />
+    </bean>
+
+    <bean id="requestConfig" factory-bean="requestConfigBuilder" factory-method="build" />
+
+    <bean id="httpClientBuilder" class="org.apache.http.impl.client.HttpClientBuilder" factory-method="create">
+        <property name="defaultRequestConfig" ref="requestConfig" />
+        <property name="maxConnTotal" value="100" />
+        <property name="maxConnPerRoute" value="100" />
+    </bean>
+
+    <bean id="httpClient" factory-bean="httpClientBuilder" factory-method="build" />
+
+    <bean id="restTemplate" class="org.springframework.web.client.RestTemplate">
+        <constructor-arg>
+            <bean class="org.springframework.http.client.HttpComponentsClientHttpRequestFactory">
+                <property name="httpClient" ref="httpClient"/>
+            </bean>
+        </constructor-arg>
+    </bean>
 
     <bean id="signInProviderFactory" class="org.apache.usergrid.security.providers.SignInProviderFactory">
         <property name="entityManagerFactory" ref="entityManagerFactory"/>
         <property name="managementService" ref="managementService"/>
+        <property name="restTemplate" ref="restTemplate"/>
     </bean>
 
-  <bean id="exportService" class="org.apache.usergrid.management.export.ExportServiceImpl" >
-    <property name="managementService" ref="managementService"/>
-    <property name="emf" ref="entityManagerFactory"/>
-    <property name="sch" ref="schedulerService"/>
-  </bean>
+    <bean id="exportService" class="org.apache.usergrid.management.export.ExportServiceImpl" >
+        <property name="managementService" ref="managementService"/>
+        <property name="emf" ref="entityManagerFactory"/>
+        <property name="sch" ref="schedulerService"/>
+    </bean>
 
-  <bean id="exportJob" class="org.apache.usergrid.management.export.ExportJob" />
+    <bean id="exportJob" class="org.apache.usergrid.management.export.ExportJob" />
 
-  <bean id="s3Export" class="org.apache.usergrid.management.export.S3ExportImpl" />
+    <bean id="s3Export" class="org.apache.usergrid.management.export.S3ExportImpl" />
 
 </beans>

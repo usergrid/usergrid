@@ -18,10 +18,9 @@ package org.apache.usergrid.security.providers;
 
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import javax.ws.rs.core.MediaType;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,11 +32,7 @@ import org.apache.usergrid.persistence.entities.User;
 import org.apache.usergrid.security.tokens.exceptions.BadTokenException;
 import org.apache.usergrid.utils.JsonUtils;
 
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.api.client.config.ClientConfig;
-import com.sun.jersey.api.client.config.DefaultClientConfig;
-import com.sun.jersey.api.json.JSONConfiguration;
+import org.springframework.web.client.RestTemplate;
 
 import static org.apache.usergrid.utils.ListUtils.anyNull;
 
@@ -52,8 +47,8 @@ public class FoursquareProvider extends AbstractProvider {
     private Logger logger = LoggerFactory.getLogger( FoursquareProvider.class );
 
 
-    FoursquareProvider( EntityManager entityManager, ManagementService managementService ) {
-        super( entityManager, managementService );
+    FoursquareProvider( EntityManager entityManager, ManagementService managementService, RestTemplate restTemplate ) {
+        super( entityManager, managementService, restTemplate );
     }
 
 
@@ -66,8 +61,18 @@ public class FoursquareProvider extends AbstractProvider {
 
     @Override
     Map<String, Object> userFromResource( String externalToken ) {
-        // TODO user extraction
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("oauth_token", externalToken);
+        params.put("v", "20140318");
+        try {
+            String json = restTemplate.getForObject("https://api.foursquare.com/v2/users/self?oauth_token={oauth_token}&v={v}", String.class, params);
+            Map<String, Object> data = (Map<String, Object>) JsonUtils.parse(json);
+            Map<String, Object> response = (Map<String, Object>) data.get("response");
+            Map<String, Object> user = (Map<String, Object>) response.get("user");
+            return user;
+        } catch (Exception e) {
+        }
+        return null;
     }
 
 
@@ -82,17 +87,9 @@ public class FoursquareProvider extends AbstractProvider {
         saveToConfiguration( "foursquareProvider", config );
     }
 
-
     @Override
     public User createOrAuthenticate( String externalToken ) throws BadTokenException {
-        ClientConfig clientConfig = new DefaultClientConfig();
-        clientConfig.getFeatures().put( JSONConfiguration.FEATURE_POJO_MAPPING, Boolean.TRUE );
-        Client client = Client.create( clientConfig );
-        WebResource web_resource = client.resource( "https://api.foursquare.com/v2/users/self" );
-        Map<String, Object> body = web_resource.queryParam( "oauth_token", externalToken ).queryParam( "v", "20120623" )
-                                               .accept( MediaType.APPLICATION_JSON ).get( Map.class );
-
-        Map<String, Object> fq_user = ( Map<String, Object> ) ( ( Map<?, ?> ) body.get( "response" ) ).get( "user" );
+        Map<String, Object> fq_user = userFromResource(externalToken);
 
         String fq_user_id = ( String ) fq_user.get( "id" );
         String fq_user_username = ( String ) fq_user.get( "id" );
@@ -101,17 +98,18 @@ public class FoursquareProvider extends AbstractProvider {
         String fq_user_name = new String( "" );
 
         // Grab the last check-in so we can store that as the user location
-        Map<String, Object> fq_location =
-                ( Map<String, Object> ) ( ( Map<?, ?> ) ( ( Map<?, ?> ) ( ( ArrayList<?> ) ( ( Map<?, ?> ) fq_user
-                        .get( "checkins" ) ).get( "items" ) ).get( 0 ) ).get( "venue" ) ).get( "location" );
-
         Map<String, Double> location = new LinkedHashMap<String, Double>();
-        location.put( "latitude", ( Double ) fq_location.get( "lat" ) );
-        location.put( "longitude", ( Double ) fq_location.get( "lng" ) );
+        try {
+            Map<String, Object> fq_location =
+                    ( Map<String, Object> ) ( ( Map<?, ?> ) ( ( Map<?, ?> ) ( ( ArrayList<?> ) ( ( Map<?, ?> ) fq_user
+                            .get("checkins") ).get( "items" ) ).get( 0 ) ).get( "venue" ) ).get( "location" );
+            location.put( "latitude", ( Double ) fq_location.get( "lat" ) );
+            location.put( "longitude", ( Double ) fq_location.get( "lng" ) );
 
-        if ( logger.isDebugEnabled() ) {
-            logger.debug( JsonUtils.mapToFormattedJsonString( location ) );
-        }
+            if ( logger.isDebugEnabled() ) {
+                logger.debug( JsonUtils.mapToFormattedJsonString( location ) );
+            }
+        } catch (Exception e) { }
 
         // Only the first name is guaranteed to be here
         try {
