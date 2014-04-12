@@ -518,10 +518,23 @@ class Client {
    * @return \Apigee\Usergrid\Entity
    */
   public function create_entity($entity_data) {
-    $entity = new Entity($this, $entity_data);
-    $response = $entity->fetch();
+    $entity     = new Entity($this, $entity_data);
+    $ok_to_save = null;
+    
+    try {
+      $response = $entity->fetch();
+    } catch (UG_401_Unauthorized $ex) {
+      // this is to be expected if the resource doesn't exist yet...
+      if ('org.apache.usergrid.services.exceptions.ServiceResourceNotFoundException' !== $ex->getMessage()) {
+        // ...otherwise throw the exception
+        throw $ex;
+      }
+      $ok_to_save = true;
+    }  
 
     $ok_to_save = (
+      $ok_to_save
+      ||
       ($response->get_error() && ('service_resource_not_found' == $response->get_error_code() || 'no_name_specified' == $response->get_error_code() || 'null_pointer' == $response->get_error_code() ))
       ||
       (!$response->get_error() && array_key_exists('getOnExist', $entity_data) && $entity_data['getOnExist'])
