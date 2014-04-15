@@ -25,7 +25,7 @@ import org.apache.usergrid.persistence.model.entity.Id;
 
 
 /**
- * Simple impl of hte collection context
+ * Simple impl of the collection context
  *
  * @author tnine
  */

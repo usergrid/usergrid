@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import me.prettyprint.hector.api.mutation.Mutator;
+
 import org.apache.usergrid.persistence.ConnectedEntityRef;
 import org.apache.usergrid.persistence.ConnectionRef;
 import org.apache.usergrid.persistence.CounterResolution;
@@ -49,6 +49,11 @@ import org.apache.usergrid.persistence.model.entity.Id;
 import org.apache.usergrid.persistence.model.entity.SimpleId;
 import org.apache.usergrid.persistence.model.field.LongField;
 import org.apache.usergrid.persistence.model.util.UUIDGenerator;
+
+import me.prettyprint.hector.api.mutation.Mutator;
+
+import static org.apache.usergrid.persistence.SimpleEntityRef.ref;
+
 
 public class CpEntityManager implements EntityManager {
 
@@ -217,7 +222,7 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public void setApplicationId(UUID applicationId) {
-        throw new UnsupportedOperationException("Not supported yet."); 
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
@@ -227,11 +232,13 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public EntityRef getApplicationRef() {
-        throw new UnsupportedOperationException("Not supported yet."); 
+        return ref( applicationScope.getOwner().getType(), applicationScope.getOwner().getUuid() );
     }
 
     @Override
     public Application getApplication() throws Exception {
+
+
         throw new UnsupportedOperationException("Not supported yet."); 
     }
 
@@ -798,7 +805,7 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public UUID getApplicationId() {
-        throw new UnsupportedOperationException("Not supported yet."); 
+        return applicationScope.getOwner().getUuid();
     }
 
     @Override
