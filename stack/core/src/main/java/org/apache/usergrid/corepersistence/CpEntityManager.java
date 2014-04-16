@@ -41,6 +41,7 @@ import org.apache.usergrid.persistence.cassandra.CassandraService;
 import org.apache.usergrid.persistence.cassandra.GeoIndexManager;
 import org.apache.usergrid.persistence.collection.CollectionScope;
 import org.apache.usergrid.persistence.collection.EntityCollectionManager;
+import org.apache.usergrid.persistence.collection.impl.CollectionScopeImpl;
 import org.apache.usergrid.persistence.entities.Application;
 import org.apache.usergrid.persistence.entities.Role;
 import org.apache.usergrid.persistence.index.EntityCollectionIndex;
@@ -237,19 +238,21 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public Application getApplication() throws Exception {
-
-
-        throw new UnsupportedOperationException("Not supported yet."); 
+        Application application = get(applicationScope.getOwner().getUuid(),Application.class);
+        return application;
     }
 
     @Override
     public void updateApplication(Application app) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet."); 
+        update( app );
+        this.applicationScope = new CollectionScopeImpl( applicationScope.getOrganization(),
+                new SimpleId( app.getUuid(),app.getType() ),app.getName());
     }
 
     @Override
+    //depends on updateProperties.
     public void updateApplication(Map<String, Object> properties) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet."); 
+        //throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
