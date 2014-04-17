@@ -71,6 +71,21 @@ public class CollectionIT extends AbstractCoreIT {
         //assertNull( user );
     }
 
+    @Test
+    public void getApplicationRef() throws Exception {
+        UUID applicationId = setup.createApplication( "testOrganization", "testFirstName" );
+        assertNotNull( applicationId );
+
+        EntityManager em = setup.getEmf().getEntityManager( applicationId );
+        assertNotNull( em );
+
+        EntityRef entityRef = em.getApplicationRef();
+        assertNotNull( entityRef );
+        assertEquals(applicationId,entityRef.getUuid());
+
+
+    }
+
 
     @Test
     public void testCollection() throws Exception {

@@ -30,7 +30,7 @@ import org.apache.usergrid.persistence.model.entity.Id;
  * @author tnine
  */
 public class CollectionScopeImpl extends OrganizationScopeImpl implements CollectionScope {
-    private final Id ownerId;
+    private Id ownerId;
     private final String name;
 
 
@@ -54,6 +54,11 @@ public class CollectionScopeImpl extends OrganizationScopeImpl implements Collec
         return name;
     }
 
+    @Override
+    public void setOwner(Id newOwner) {
+        ownerId = newOwner;
+//        ValidationUtils.validateCollectionScope( this );
+    }
 
     @Override
     public boolean equals( final Object o ) {
