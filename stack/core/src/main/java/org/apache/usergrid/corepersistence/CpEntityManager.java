@@ -131,6 +131,8 @@ import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtil
 import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.batchExecute;
 import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.key;
 import static org.apache.usergrid.utils.ConversionUtils.getLong;
+import static org.apache.usergrid.utils.ConversionUtils.string;
+import static org.apache.usergrid.utils.ConversionUtils.uuid;
 import static org.apache.usergrid.utils.UUIDUtils.getTimestampInMicros;
 import static org.apache.usergrid.utils.UUIDUtils.isTimeBased;
 import static org.apache.usergrid.utils.UUIDUtils.newTimeUUID;
@@ -340,7 +342,58 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public <A extends Entity> A get(UUID entityId, Class<A> entityClass) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        A e = null;
+        try {
+            e = ( A ) getEntity( entityId, ( Class<Entity> ) entityClass );
+        }
+        catch ( ClassCastException e1 ) {
+            logger.error( "Unable to get typed entity: {} of class {}", new Object[] {entityId, entityClass.getCanonicalName(), e1} );
+        }
+        return e;
+    }
+
+    /**
+     * Gets the specified entity.
+     *
+     * @param entityId the entity id
+     * @param entityClass the entity class
+     *
+     * @return entity
+     *
+     * @throws Exception the exception
+     */
+    public <A extends Entity> A getEntity( UUID entityId, Class<A> entityClass ) throws Exception {
+
+        Object entity_key = key( entityId );
+        Map<String, Object> results = null;
+
+        // if (entityType == null) {
+        results = deserializeEntityProperties(
+                cass.getAllColumns( cass.getApplicationKeyspace( getApplicationId() ), ENTITY_PROPERTIES, entity_key ) );
+        // } else {
+        // Set<String> columnNames = Schema.getPropertyNames(entityType);
+        // results = getColumns(getApplicationKeyspace(applicationId),
+        // EntityCF.PROPERTIES, entity_key, columnNames, se, be);
+        // }
+
+        if ( results == null ) {
+            logger.warn( "getEntity(): No properties found for entity {}, probably doesn't exist...", entityId );
+            return null;
+        }
+
+        UUID id = uuid( results.get( PROPERTY_UUID ) );
+        String type = string( results.get( PROPERTY_TYPE ) );
+
+        if ( !entityId.equals( id ) ) {
+
+            logger.error( "Expected entity id {}, found {}. Returning null entity", new Object[]{entityId, id, new Throwable()} );
+            return null;
+        }
+
+        A entity = EntityFactory.newEntity( id, type, entityClass );
+        entity.setProperties( results );
+
+        return entity;
     }
 
 
