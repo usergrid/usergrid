@@ -41,4 +41,6 @@ public interface CollectionScope extends OrganizationScope {
      *         Id, but could be an entity Id that is the parent of another collection
      */
     public Id getOwner();
+    
+    public void setOwner(Id newOwner);
 }

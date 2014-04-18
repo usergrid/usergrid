@@ -57,7 +57,8 @@ public class EntityDictionaryIT extends AbstractCoreIT {
 
         LOG.info( "EntityDictionaryIT.testApplicationDictionaries" );
 
-        UUID applicationId = setup.createApplication( "testOrganization", "testApplicationDictionaries" );
+        //UUID applicationId = setup.createApplication( "testOrganization", "testApplicationDictionaries" );
+        UUID applicationId = UUID.fromString("b6768a08-b5d5-11e3-a495-10ddb1de66c4");
         assertNotNull( applicationId );
 
         EntityManager em = setup.getEmf().getEntityManager( applicationId );
@@ -74,7 +75,8 @@ public class EntityDictionaryIT extends AbstractCoreIT {
     public void testUserDictionaries() throws Exception {
         LOG.info( "EntityDictionaryIT.testUserDictionaries" );
 
-        UUID applicationId = setup.createApplication( "testOrganization", "testUserDictionaries" );
+       // UUID applicationId = setup.createApplication( "testOrganization", "testUserDictionaries" );
+        UUID applicationId = UUID.fromString("b6768a08-b5d5-11e3-a495-10ddb1de66c4");
         assertNotNull( applicationId );
 
         EntityManager em = setup.getEmf().getEntityManager( applicationId );

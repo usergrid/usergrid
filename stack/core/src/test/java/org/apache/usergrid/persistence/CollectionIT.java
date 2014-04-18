@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -70,6 +71,47 @@ public class CollectionIT extends AbstractCoreIT {
         user = app.get( user.getUuid() );
         //assertNull( user );
     }
+
+    //updateApplication
+    //getApplicationId
+
+
+    @Test
+    public void testGetApplicationRef() throws Exception {
+        UUID applicationId = setup.createApplication( "testOrganization", "testFirstName" );
+        assertNotNull( applicationId );
+
+        EntityManager em = setup.getEmf().getEntityManager( applicationId );
+        assertNotNull( em );
+
+        EntityRef entityRef = em.getApplicationRef();
+        assertNotNull( entityRef );
+        assertEquals(applicationId,entityRef.getUuid());
+    }
+
+    @Test
+    public void testGetApplicationId() throws Exception {
+        EntityManager em = setup.getEmf().getEntityManager( UUID.fromString( "b6768a08-b5d5-11e3-a495-10ddb1de66c4" ) );
+        assertEquals( UUID.fromString( "b6768a08-b5d5-11e3-a495-10ddb1de66c4" ),em.getApplicationId());
+    }
+
+    //this can't really be tested without creating unique createApplication
+    @Ignore
+    @Test
+    public void getApplication() throws Exception {
+        UUID applicationId = setup.createApplication( "testOrganization", "testFirstName" );
+        assertNotNull( applicationId );
+
+        EntityManager em = setup.getEmf().getEntityManager( applicationId );
+        assertNotNull( em );
+
+        org.apache.usergrid.persistence.entities.Application application = em.getApplication();
+        assertNotNull( application );
+        assertEquals( "testFirstName", application.getApplicationName() );
+        assertEquals( applicationId, application.getUuid() );
+    }
+
+
 
 
     @Test
