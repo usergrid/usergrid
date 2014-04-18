@@ -32,11 +32,12 @@ import java.util.UUID;
 import org.codehaus.jackson.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.usergrid.utils.JsonUtils;
 
 import org.apache.cassandra.thrift.ColumnDef;
 import org.apache.cassandra.thrift.IndexType;
 import org.apache.commons.lang.StringUtils;
+
+import org.apache.usergrid.utils.JsonUtils;
 
 import me.prettyprint.cassandra.serializers.ByteBufferSerializer;
 import me.prettyprint.cassandra.serializers.StringSerializer;
@@ -305,7 +306,7 @@ public class CassandraPersistenceUtils {
         if ( keyStr.length() == 0 ) {
             return NULL_ID;
         }
-        UUID uuid = UUID.nameUUIDFromBytes( keyStr.getBytes() );
+         UUID uuid = UUID.nameUUIDFromBytes( keyStr.getBytes() );
         logger.debug( "Key {} equals UUID {}", keyStr, uuid );
         return uuid;
     }
