@@ -85,6 +85,7 @@ import org.apache.usergrid.persistence.model.entity.SimpleId;
 import org.apache.usergrid.persistence.model.field.LongField;
 import org.apache.usergrid.persistence.model.util.UUIDGenerator;
 import org.apache.usergrid.persistence.schema.CollectionInfo;
+import org.apache.usergrid.utils.ClassUtils;
 import org.apache.usergrid.utils.UUIDUtils;
 
 import com.google.inject.Guice;
@@ -95,6 +96,7 @@ import com.yammer.metrics.annotation.Metered;
 import me.prettyprint.cassandra.serializers.ByteBufferSerializer;
 import me.prettyprint.cassandra.serializers.StringSerializer;
 import me.prettyprint.cassandra.serializers.UUIDSerializer;
+import me.prettyprint.hector.api.beans.DynamicComposite;
 import me.prettyprint.hector.api.beans.HColumn;
 import me.prettyprint.hector.api.mutation.Mutator;
 
@@ -132,7 +134,10 @@ import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtil
 import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.addPropertyToMutator;
 import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.batchExecute;
 import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.key;
+import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.toStorableBinaryValue;
+import static org.apache.usergrid.utils.ConversionUtils.bytebuffer;
 import static org.apache.usergrid.utils.ConversionUtils.getLong;
+import static org.apache.usergrid.utils.ConversionUtils.object;
 import static org.apache.usergrid.utils.ConversionUtils.string;
 import static org.apache.usergrid.utils.ConversionUtils.uuid;
 import static org.apache.usergrid.utils.UUIDUtils.getTimestampInMicros;
@@ -341,8 +346,9 @@ public class CpEntityManager implements EntityManager {
         if ( entityRef == null ) {
             return null;
         }
-        return getEntity( entityRef.getUuid(), null );
-       // return getEntity(entityRef.getUuid(),null); //get( entityRef.getUuid(), entityRef.getType() );
+
+        //return getEntity( entityRef.getUuid(), null );
+        return get( entityRef.getUuid(), entityRef.getType() );
     }
 
 
@@ -373,6 +379,7 @@ public class CpEntityManager implements EntityManager {
         Object entity_key = key( entityId );
         Map<String, Object> results = null;
 
+        //gets the entity properties
         // if (entityType == null) {
         results = deserializeEntityProperties(
                 cass.getAllColumns( cass.getApplicationKeyspace( getApplicationId() ), ENTITY_PROPERTIES, entity_key ) );
@@ -575,7 +582,33 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public EntityRef getRef(UUID entityId) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        String entityType = getEntityType( entityId );
+        if ( entityType == null ) {
+            logger.warn( "Unable to get type for entity: {} ", new Object[] { entityId, new Exception()} );
+            return null;
+        }
+        return ref( entityType, entityId );
+    }
+
+    /**
+     * Gets the type.
+     *
+     * @param entityId the entity id
+     *
+     * @return entity type
+     *
+     * @throws Exception the exception
+     */
+    @Metered( group = "core", name = "EntityManager_getEntityType" )
+    public String getEntityType( UUID entityId ) throws Exception {
+
+//        HColumn<String, String> column =
+//                cass.getColumn( cass.getApplicationKeyspace( getApplicationId() ), ENTITY_PROPERTIES, key( entityId ),
+//                        PROPERTY_TYPE, se, se );
+//        if ( column != null ) {
+//            return column.getValue();
+//        }
+        return get( entityId ).getType();
     }
 
 
@@ -628,13 +661,25 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public void addToDictionary(EntityRef entityRef, String dictionaryName, Object elementValue) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        addToDictionary( entityRef, dictionaryName, elementValue, null );
     }
 
     @Override
     public void addToDictionary(EntityRef entityRef, String dictionaryName,
             Object elementName, Object elementValue) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        if ( elementValue == null ) {
+            return;
+        }
+
+        EntityRef entity = entityRef;//getRef( entityRef.getUuid() );
+
+        UUID timestampUuid = newTimeUUID();
+        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( getApplicationId() ), be );
+
+        batch = batchUpdateDictionary( batch, entity, dictionaryName, elementName, elementValue, false,
+                timestampUuid );
+
+        batchExecute( batch, CassandraService.RETRY_COUNT );
     }
 
     @Override
@@ -654,7 +699,40 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public Object getDictionaryElementValue(EntityRef entityRef, String dictionaryName, String elementName) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        Object value = null;
+
+        ApplicationCF dictionaryCf = null;
+
+        boolean entityHasDictionary = getDefaultSchema().hasDictionary( entityRef.getType(), dictionaryName );
+
+        if ( entityHasDictionary ) {
+            dictionaryCf = ENTITY_DICTIONARIES;
+        }
+        else {
+            dictionaryCf = ENTITY_COMPOSITE_DICTIONARIES;
+        }
+
+        Class<?> dictionaryCoType = getDefaultSchema().getDictionaryValueType( entityRef.getType(), dictionaryName );
+        boolean coTypeIsBasic = ClassUtils.isBasicType( dictionaryCoType );
+
+        HColumn<ByteBuffer, ByteBuffer> result =
+                cass.getColumn( cass.getApplicationKeyspace( getApplicationId() ), dictionaryCf,
+                        key( entityRef.getUuid(), dictionaryName ),
+                        entityHasDictionary ? bytebuffer( elementName ) : DynamicComposite.toByteBuffer( elementName ),
+                        be, be );
+        if ( result != null ) {
+            if ( entityHasDictionary && coTypeIsBasic ) {
+                value = object( dictionaryCoType, result.getValue() );
+            }
+            else if ( result.getValue().remaining() > 0 ) {
+                value = Schema.deserializePropertyValueFromJsonBinary( result.getValue().slice(), dictionaryCoType );
+            }
+        }
+        else {
+            logger.info( "Results of EntityManagerImpl.getDictionaryElementValue is null" );
+        }
+
+        return value;
     }
 
     @Override
@@ -1562,12 +1640,52 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public Mutator<ByteBuffer> batchUpdateDictionary(Mutator<ByteBuffer> batch, EntityRef entity, String dictionaryName, Object elementValue, Object elementCoValue, boolean removeFromDictionary, UUID timestampUuid) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        long timestamp = getTimestampInMicros( timestampUuid );
+
+        // dictionaryName = dictionaryName.toLowerCase();
+        if ( elementCoValue == null ) {
+            elementCoValue = ByteBuffer.allocate( 0 );
+        }
+
+        boolean entityHasDictionary = getDefaultSchema().hasDictionary( entity.getType(), dictionaryName );
+
+        // Don't index dynamic dictionaries not defined by the schema
+        if ( entityHasDictionary ) {
+            RelationManagerImpl relationManager = getRelationManager( entity );
+            //relationManager.set
+            relationManager
+                    .batchUpdateSetIndexes( batch, dictionaryName, elementValue, removeFromDictionary, timestampUuid);
+        }
+
+        ApplicationCF dictionary_cf = entityHasDictionary ? ENTITY_DICTIONARIES : ENTITY_COMPOSITE_DICTIONARIES;
+
+        if ( elementValue != null ) {
+            if ( !removeFromDictionary ) {
+                // Set the new value
+
+                elementCoValue = toStorableBinaryValue( elementCoValue, !entityHasDictionary );
+
+                addInsertToMutator( batch, dictionary_cf, key( entity.getUuid(), dictionaryName ),
+                        entityHasDictionary ? elementValue : asList( elementValue ), elementCoValue, timestamp );
+
+                if ( !entityHasDictionary ) {
+                    addInsertToMutator( batch, ENTITY_DICTIONARIES, key( entity.getUuid(), DICTIONARY_SETS ),
+                            dictionaryName, null, timestamp );
+                }
+            }
+            else {
+                addDeleteToMutator( batch, dictionary_cf, key( entity.getUuid(), dictionaryName ),
+                        entityHasDictionary ? elementValue : asList( elementValue ), timestamp );
+            }
+        }
+
+        return batch;
     }
 
     @Override
     public Mutator<ByteBuffer> batchUpdateDictionary(Mutator<ByteBuffer> batch, EntityRef entity, String dictionaryName, Object elementValue, boolean removeFromDictionary, UUID timestampUuid) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return batchUpdateDictionary( batch, entity, dictionaryName, elementValue, null, removeFromDictionary,
+                timestampUuid );
     }
 
     @Override
