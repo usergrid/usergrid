@@ -38,6 +38,7 @@ import org.apache.cassandra.thrift.IndexType;
 import org.apache.commons.lang.StringUtils;
 
 import org.apache.usergrid.utils.JsonUtils;
+import org.apache.usergrid.utils.UUIDUtils;
 
 import me.prettyprint.cassandra.serializers.ByteBufferSerializer;
 import me.prettyprint.cassandra.serializers.StringSerializer;
@@ -306,7 +307,7 @@ public class CassandraPersistenceUtils {
         if ( keyStr.length() == 0 ) {
             return NULL_ID;
         }
-         UUID uuid = UUID.nameUUIDFromBytes( keyStr.getBytes() );
+         UUID uuid = UUIDUtils.newTimeUUID();//UUID.nameUUIDFromBytes( keyStr.getBytes() );
         logger.debug( "Key {} equals UUID {}", keyStr, uuid );
         return uuid;
     }

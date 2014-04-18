@@ -56,6 +56,7 @@ import org.apache.usergrid.persistence.Schema;
 import org.apache.usergrid.persistence.SimpleEntityRef;
 import org.apache.usergrid.persistence.SimpleRoleRef;
 import org.apache.usergrid.persistence.TypedEntity;
+import org.apache.usergrid.persistence.cassandra.ApplicationCF;
 import org.apache.usergrid.persistence.cassandra.CassandraService;
 import org.apache.usergrid.persistence.cassandra.CounterUtils;
 import org.apache.usergrid.persistence.cassandra.EntityManagerFactoryImpl;
@@ -104,6 +105,7 @@ import static me.prettyprint.hector.api.factory.HFactory.createMutator;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.usergrid.locking.LockHelper.getUniqueUpdateLock;
 import static org.apache.usergrid.persistence.Schema.COLLECTION_ROLES;
+import static org.apache.usergrid.persistence.Schema.DICTIONARY_PERMISSIONS;
 import static org.apache.usergrid.persistence.Schema.DICTIONARY_PROPERTIES;
 import static org.apache.usergrid.persistence.Schema.DICTIONARY_SETS;
 import static org.apache.usergrid.persistence.Schema.PROPERTY_CREATED;
@@ -336,7 +338,11 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public Entity get(EntityRef entityRef) throws Exception {
-        return get( entityRef.getUuid(), entityRef.getType() );
+        if ( entityRef == null ) {
+            return null;
+        }
+        return getEntity( entityRef.getUuid(), null );
+       // return getEntity(entityRef.getUuid(),null); //get( entityRef.getUuid(), entityRef.getType() );
     }
 
 
@@ -856,8 +862,21 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public void grantRolePermissions(String roleName, Collection<String> permissions) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        roleName = roleName.toLowerCase();
+        long timestamp = cass.createTimestamp();
+        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( getApplicationId() ), be );
+        for ( String permission : permissions ) {
+            permission = permission.toLowerCase();
+            addInsertToMutator( batch, ApplicationCF.ENTITY_DICTIONARIES, getRolePermissionsKey( roleName ), permission,
+                    ByteBuffer.allocate( 0 ), timestamp );
+        }
+        batchExecute( batch, CassandraService.RETRY_COUNT );
     }
+
+    public Object getRolePermissionsKey( String roleName ) {
+        return key( getIdForRoleName( roleName ), DICTIONARY_PERMISSIONS );
+    }
+
 
     @Override
     public void revokeRolePermission(String roleName, String permission) throws Exception {
