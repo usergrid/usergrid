@@ -465,8 +465,8 @@ public class EntityManagerImpl implements EntityManager {
 
         // Don't index dynamic dictionaries not defined by the schema
         if ( entityHasDictionary ) {
-            //getRelationManager( entity )
-              //      .batchUpdateSetIndexes( batch, dictionaryName, elementValue, removeFromDictionary, timestampUuid );
+            getRelationManager( entity )
+                    .batchUpdateSetIndexes( batch, dictionaryName, elementValue, removeFromDictionary, timestampUuid );
         }
 
         ApplicationCF dictionary_cf = entityHasDictionary ? ENTITY_DICTIONARIES : ENTITY_COMPOSITE_DICTIONARIES;
