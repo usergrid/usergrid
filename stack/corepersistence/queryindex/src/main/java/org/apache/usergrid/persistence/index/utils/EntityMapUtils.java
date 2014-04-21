@@ -19,17 +19,19 @@
 
 package org.apache.usergrid.persistence.index.utils;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import static org.apache.usergrid.persistence.index.impl.EsEntityCollectionIndex.ANALYZED_SUFFIX;
-import static org.apache.usergrid.persistence.index.impl.EsEntityCollectionIndex.GEO_SUFFIX;
+import java.util.UUID;
+
 import org.apache.usergrid.persistence.model.entity.Entity;
 import org.apache.usergrid.persistence.model.field.ArrayField;
 import org.apache.usergrid.persistence.model.field.BooleanField;
+import org.apache.usergrid.persistence.model.field.ByteBufferField;
 import org.apache.usergrid.persistence.model.field.DoubleField;
 import org.apache.usergrid.persistence.model.field.EntityObjectField;
 import org.apache.usergrid.persistence.model.field.Field;
@@ -40,7 +42,11 @@ import org.apache.usergrid.persistence.model.field.LocationField;
 import org.apache.usergrid.persistence.model.field.LongField;
 import org.apache.usergrid.persistence.model.field.SetField;
 import org.apache.usergrid.persistence.model.field.StringField;
+import org.apache.usergrid.persistence.model.field.UUIDField;
 import org.apache.usergrid.persistence.model.field.value.Location;
+
+import static org.apache.usergrid.persistence.index.impl.EsEntityCollectionIndex.ANALYZED_SUFFIX;
+import static org.apache.usergrid.persistence.index.impl.EsEntityCollectionIndex.GEO_SUFFIX;
 
 
 public class EntityMapUtils {
@@ -78,44 +84,48 @@ public class EntityMapUtils {
                 entity.setField( new LongField( fieldName, (Long)value ));
 
             } else if ( value instanceof List) {
-                entity.setField( listToListField( fieldName, (List)value ));
-
+                entity.setField( listToListField( fieldName, ( List ) value ) );
+            } else if (value instanceof UUID) {
+                entity.setField( new UUIDField( fieldName, entity.getId().getUuid() ) );
+            }else if (value instanceof ByteBuffer) {
+                entity.setField( new ByteBufferField( fieldName, (ByteBuffer) value ) );
             } else if ( value instanceof Map ) {
 
-				Field field = null;
+                Field field = null;
 
-				// is the map really a location element?
-				Map<String, Object> m = (Map<String, Object>)value;
-				if ( m.size() == 2) {
-					Double lat = null;
-					Double lon = null;
-					try {
-						if ( m.get("latitude") != null && m.get("longitude") != null ) {
-							lat = Double.parseDouble( m.get("latitude").toString() );
-							lon = Double.parseDouble( m.get("longitude").toString() );
+                // is the map really a location element?
+                Map<String, Object> m = ( Map<String, Object> ) value;
+                if ( m.size() == 2 ) {
+                    Double lat = null;
+                    Double lon = null;
+                    try {
+                        if ( m.get( "latitude" ) != null && m.get( "longitude" ) != null ) {
+                            lat = Double.parseDouble( m.get( "latitude" ).toString() );
+                            lon = Double.parseDouble( m.get( "longitude" ).toString() );
+                        }
+                        else if ( m.get( "lat" ) != null && m.get( "lon" ) != null ) {
+                            lat = Double.parseDouble( m.get( "lat" ).toString() );
+                            lon = Double.parseDouble( m.get( "lon" ).toString() );
+                        }
+                    }
+                    catch ( NumberFormatException ignored ) {
+                    }
 
-						} else if ( m.get("lat") != null && m.get("lon") != null ) { 
-							lat = Double.parseDouble( m.get("lat").toString() );
-							lon = Double.parseDouble( m.get("lon").toString() );
-						}
-					} catch ( NumberFormatException ignored ) {}
+                    if ( lat != null && lon != null ) {
+                        field = new LocationField( fieldName, new Location( lat, lon ) );
+                    }
+                }
 
-					if ( lat != null && lon != null ) {
-						field = new LocationField( fieldName, new Location( lat, lon ));
-					}
-				}
 
-				if ( field == null ) { 
+                if ( field == null ) {
 
-					// not a location element, process it as map
-					entity.setField( new EntityObjectField( fieldName, 
-						fromMap( (Map<String, Object>)value ))); // recursion
-
-				} else {
-					entity.setField( field );
-				}
-	
-			} else {
+                    // not a location element, process it as map
+                    entity.setField( new EntityObjectField( fieldName, fromMap( ( Map ) value ) ) ); // recursion
+                }
+                else {
+                    entity.setField( field );
+                }
+            }  else {
                 throw new RuntimeException("Unknown type " + value.getClass().getName());
             }
         }

@@ -88,6 +88,7 @@ import org.apache.usergrid.persistence.schema.CollectionInfo;
 import org.apache.usergrid.utils.ClassUtils;
 import org.apache.usergrid.utils.UUIDUtils;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.netflix.config.ConfigurationManager;
@@ -96,7 +97,6 @@ import com.yammer.metrics.annotation.Metered;
 import me.prettyprint.cassandra.serializers.ByteBufferSerializer;
 import me.prettyprint.cassandra.serializers.StringSerializer;
 import me.prettyprint.cassandra.serializers.UUIDSerializer;
-import me.prettyprint.hector.api.beans.DynamicComposite;
 import me.prettyprint.hector.api.beans.HColumn;
 import me.prettyprint.hector.api.mutation.Mutator;
 
@@ -135,9 +135,7 @@ import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtil
 import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.batchExecute;
 import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.key;
 import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.toStorableBinaryValue;
-import static org.apache.usergrid.utils.ConversionUtils.bytebuffer;
 import static org.apache.usergrid.utils.ConversionUtils.getLong;
-import static org.apache.usergrid.utils.ConversionUtils.object;
 import static org.apache.usergrid.utils.ConversionUtils.string;
 import static org.apache.usergrid.utils.ConversionUtils.uuid;
 import static org.apache.usergrid.utils.UUIDUtils.getTimestampInMicros;
@@ -346,7 +344,6 @@ public class CpEntityManager implements EntityManager {
         if ( entityRef == null ) {
             return null;
         }
-
         //return getEntity( entityRef.getUuid(), null );
         return get( entityRef.getUuid(), entityRef.getType() );
     }
@@ -602,12 +599,6 @@ public class CpEntityManager implements EntityManager {
     @Metered( group = "core", name = "EntityManager_getEntityType" )
     public String getEntityType( UUID entityId ) throws Exception {
 
-//        HColumn<String, String> column =
-//                cass.getColumn( cass.getApplicationKeyspace( getApplicationId() ), ENTITY_PROPERTIES, key( entityId ),
-//                        PROPERTY_TYPE, se, se );
-//        if ( column != null ) {
-//            return column.getValue();
-//        }
         return get( entityId ).getType();
     }
 
@@ -659,6 +650,7 @@ public class CpEntityManager implements EntityManager {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
+    //TODO: this doesn't really add or do anything.
     @Override
     public void addToDictionary(EntityRef entityRef, String dictionaryName, Object elementValue) throws Exception {
         addToDictionary( entityRef, dictionaryName, elementValue, null );
@@ -670,16 +662,33 @@ public class CpEntityManager implements EntityManager {
         if ( elementValue == null ) {
             return;
         }
+        ObjectMapper mapper = new ObjectMapper(  );
+
+
+        ;
+        ByteBuffer byteBuffer = be.fromBytes( mapper.writeValueAsBytes( elementValue ) );
 
         EntityRef entity = entityRef;//getRef( entityRef.getUuid() );
 
         UUID timestampUuid = newTimeUUID();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( getApplicationId() ), be );
+        Map properties;
 
-        batch = batchUpdateDictionary( batch, entity, dictionaryName, elementName, elementValue, false,
-                timestampUuid );
+        if(elementName instanceof String)
+            properties = new HashMap<String, Object>();
+        else
+            properties = new HashMap<Object, Object>();
 
-        batchExecute( batch, CassandraService.RETRY_COUNT );
+        //Map<Object,Object> derp = ( Map<Object, Object> ) elementValue;
+        Map<String, Object> dictionaryNamedProperties = new HashMap<String,Object>();
+        properties.put( elementName, byteBuffer);
+        dictionaryNamedProperties.put( dictionaryName,properties );
+
+        Entity ent = get( entityRef );
+        ent.addProperties( dictionaryNamedProperties );
+
+        update( ent );
+
+
     }
 
     @Override
@@ -715,22 +724,31 @@ public class CpEntityManager implements EntityManager {
         Class<?> dictionaryCoType = getDefaultSchema().getDictionaryValueType( entityRef.getType(), dictionaryName );
         boolean coTypeIsBasic = ClassUtils.isBasicType( dictionaryCoType );
 
-        HColumn<ByteBuffer, ByteBuffer> result =
-                cass.getColumn( cass.getApplicationKeyspace( getApplicationId() ), dictionaryCf,
-                        key( entityRef.getUuid(), dictionaryName ),
-                        entityHasDictionary ? bytebuffer( elementName ) : DynamicComposite.toByteBuffer( elementName ),
-                        be, be );
-        if ( result != null ) {
-            if ( entityHasDictionary && coTypeIsBasic ) {
-                value = object( dictionaryCoType, result.getValue() );
-            }
-            else if ( result.getValue().remaining() > 0 ) {
-                value = Schema.deserializePropertyValueFromJsonBinary( result.getValue().slice(), dictionaryCoType );
-            }
-        }
-        else {
-            logger.info( "Results of EntityManagerImpl.getDictionaryElementValue is null" );
-        }
+        value = get(entityRef.getUuid());
+        org.apache.usergrid.persistence.index.query.Query query = new org.apache.usergrid.persistence.index.query.Query(  );
+        query.setQl( "where name = " + elementName );
+
+        eci.execute( query );
+
+       // get(entityRef);
+       // AstyanaxKeyspaceProvider astyanaxKeyspaceProvider = new AstyanaxKeyspaceProvider( CassandraFig );
+
+//        HColumn<ByteBuffer, ByteBuffer> result =
+//                cass.getColumn( cass.getApplicationKeyspace( getApplicationId() ), dictionaryCf,
+//                        key( entityRef.getUuid(), dictionaryName ),
+//                        entityHasDictionary ? bytebuffer( elementName ) : DynamicComposite.toByteBuffer( elementName ),
+//                        be, be );
+//        if ( result != null ) {
+//            if ( entityHasDictionary && coTypeIsBasic ) {
+//                value = object( dictionaryCoType, result.getValue() );
+//            }
+//            else if ( result.getValue().remaining() > 0 ) {
+//                value = Schema.deserializePropertyValueFromJsonBinary( result.getValue().slice(), dictionaryCoType );
+//            }
+//        }
+//        else {
+//            logger.info( "Results of EntityManagerImpl.getDictionaryElementValue is null" );
+//        }
 
         return value;
     }
