@@ -17,6 +17,7 @@
 package org.apache.usergrid.persistence;
 
 
+import java.io.Serializable;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -29,7 +30,7 @@ import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
 
 
 @XmlRootElement
-public class CredentialsInfo implements Comparable<CredentialsInfo> {
+public class CredentialsInfo implements Comparable<CredentialsInfo> , Serializable{
 
     boolean recoverable;
     boolean encrypted;

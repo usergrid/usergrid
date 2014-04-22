@@ -664,9 +664,7 @@ public class CpEntityManager implements EntityManager {
         }
         ObjectMapper mapper = new ObjectMapper(  );
 
-
-        ;
-        ByteBuffer byteBuffer = be.fromBytes( mapper.writeValueAsBytes( elementValue ) );
+        //ByteBuffer byteBuffer = be.fromBytes( mapper.writeValueAsBytes( elementValue ) );
 
         EntityRef entity = entityRef;//getRef( entityRef.getUuid() );
 
@@ -680,7 +678,7 @@ public class CpEntityManager implements EntityManager {
 
         //Map<Object,Object> derp = ( Map<Object, Object> ) elementValue;
         Map<String, Object> dictionaryNamedProperties = new HashMap<String,Object>();
-        properties.put( elementName, byteBuffer);
+        properties.put( elementName, elementValue);
         dictionaryNamedProperties.put( dictionaryName,properties );
 
         Entity ent = get( entityRef );
