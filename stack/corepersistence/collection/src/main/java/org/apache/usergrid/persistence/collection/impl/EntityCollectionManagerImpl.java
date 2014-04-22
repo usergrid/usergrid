@@ -220,71 +220,71 @@ public class EntityCollectionManagerImpl implements EntityCollectionManager {
         return Observable.from( new CollectionIoEvent<Id>( collectionScope, entityId ) )
             .subscribeOn( Schedulers.io() ).map( load );
     }
-
-    public <T> Observable<Entity> write(Id owner,String name,T element){
-        Preconditions.checkNotNull( owner, "owner required  " );
-        Preconditions.checkNotNull( owner.getUuid(), "owner uuid required ");
-        Preconditions.checkNotNull( owner.getType(), "owner type required");
-
-
-        CollectionIoEvent<Id> writeData = new CollectionIoEvent<Id>( collectionScope, owner );
-
-        Observable<CollectionIoEvent<MvccEntity>> observable =
-                Observable.from( writeData ).subscribeOn( Schedulers.io() ).map( writeStart ).flatMap(
-                        new Func1<CollectionIoEvent<MvccEntity>, Observable<CollectionIoEvent<MvccEntity>>>() {
-
-                            @Override
-                            public Observable<CollectionIoEvent<MvccEntity>> call(
-                                    final CollectionIoEvent<MvccEntity> mvccEntityCollectionIoEvent ) {
-
-                                // do the unique and optimistic steps in parallel
-
-                                // unique function.  Since there can be more than 1 unique value in this
-                                // entity the unique verify step itself is multiple parallel executions.
-                                // This is why we use "flatMap" instead of "map", which allows the
-                                // WriteVerifyUnique stage to execute multiple verification steps in
-                                // parallel and zip the results
-
-
-                                Observable<CollectionIoEvent<MvccEntity>> unique =
-                                        Observable.from( mvccEntityCollectionIoEvent ).subscribeOn( Schedulers.io() )
-                                                  .flatMap( writeVerifyUnique);
-
-
-                                // optimistic verification
-                                Observable<CollectionIoEvent<MvccEntity>> optimistic =
-                                        Observable.from( mvccEntityCollectionIoEvent ).subscribeOn( Schedulers.io() )
-                                                  .map( writeOptimisticVerify );
-
-
-                                // zip the results
-                                // TODO: Should the zip only return errors here, and if errors are present,
-                                // we throw during the zip phase?  I couldn't find "
-
-                                return Observable.zip( unique, optimistic, new Func2<CollectionIoEvent<MvccEntity>,
-                                        CollectionIoEvent<MvccEntity>, CollectionIoEvent<MvccEntity>>() {
-                                    @Override
-                                    public CollectionIoEvent<MvccEntity> call(
-                                            final CollectionIoEvent<MvccEntity> mvccEntityCollectionIoEvent,
-                                            final CollectionIoEvent<MvccEntity> mvccEntityCollectionIoEvent2 ) {
-
-                                        return mvccEntityCollectionIoEvent;
-                                    }
-                                } );
-                            }
-                        } );
-
-
-        // execute all validation stages concurrently.  Needs refactored when this is done.
-        // https://github.com/Netflix/RxJava/issues/627
-        // observable = Concurrent.concurrent( observable, Schedulers.io(), new WaitZip(),
-        //                  writeVerifyUnique, writeOptimisticVerify );
-
-        //return the commit result.
-        return observable.map( writeCommit );
-
-        return null;
-    }
+//
+//    public <T> Observable<Entity> write(Id owner,String name,T element){
+//        Preconditions.checkNotNull( owner, "owner required  " );
+//        Preconditions.checkNotNull( owner.getUuid(), "owner uuid required ");
+//        Preconditions.checkNotNull( owner.getType(), "owner type required");
+//
+//
+//        CollectionIoEvent<Id> writeData = new CollectionIoEvent<Id>( collectionScope, owner );
+//
+//        Observable<CollectionIoEvent<MvccEntity>> observable =
+//                Observable.from( writeData ).subscribeOn( Schedulers.io() ).map( writeStart ).flatMap(
+//                        new Func1<CollectionIoEvent<MvccEntity>, Observable<CollectionIoEvent<MvccEntity>>>() {
+//
+//                            @Override
+//                            public Observable<CollectionIoEvent<MvccEntity>> call(
+//                                    final CollectionIoEvent<MvccEntity> mvccEntityCollectionIoEvent ) {
+//
+//                                // do the unique and optimistic steps in parallel
+//
+//                                // unique function.  Since there can be more than 1 unique value in this
+//                                // entity the unique verify step itself is multiple parallel executions.
+//                                // This is why we use "flatMap" instead of "map", which allows the
+//                                // WriteVerifyUnique stage to execute multiple verification steps in
+//                                // parallel and zip the results
+//
+//
+//                                Observable<CollectionIoEvent<MvccEntity>> unique =
+//                                        Observable.from( mvccEntityCollectionIoEvent ).subscribeOn( Schedulers.io() )
+//                                                  .flatMap( writeVerifyUnique);
+//
+//
+//                                // optimistic verification
+//                                Observable<CollectionIoEvent<MvccEntity>> optimistic =
+//                                        Observable.from( mvccEntityCollectionIoEvent ).subscribeOn( Schedulers.io() )
+//                                                  .map( writeOptimisticVerify );
+//
+//
+//                                // zip the results
+//                                // TODO: Should the zip only return errors here, and if errors are present,
+//                                // we throw during the zip phase?  I couldn't find "
+//
+//                                return Observable.zip( unique, optimistic, new Func2<CollectionIoEvent<MvccEntity>,
+//                                        CollectionIoEvent<MvccEntity>, CollectionIoEvent<MvccEntity>>() {
+//                                    @Override
+//                                    public CollectionIoEvent<MvccEntity> call(
+//                                            final CollectionIoEvent<MvccEntity> mvccEntityCollectionIoEvent,
+//                                            final CollectionIoEvent<MvccEntity> mvccEntityCollectionIoEvent2 ) {
+//
+//                                        return mvccEntityCollectionIoEvent;
+//                                    }
+//                                } );
+//                            }
+//                        } );
+//
+//
+//        // execute all validation stages concurrently.  Needs refactored when this is done.
+//        // https://github.com/Netflix/RxJava/issues/627
+//        // observable = Concurrent.concurrent( observable, Schedulers.io(), new WaitZip(),
+//        //                  writeVerifyUnique, writeOptimisticVerify );
+//
+//        //return the commit result.
+//        return observable.map( writeCommit );
+//
+//        return null;
+//    }
 
 
 
