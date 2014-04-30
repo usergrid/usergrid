@@ -72,6 +72,7 @@ public class EntityDictionaryIT extends AbstractCoreIT {
         em.addToDictionary( em.getApplicationRef(), "oauthproviders", "google", provider );
 
         Object o = em.getDictionaryElementValue( em.getApplicationRef(), "oauthproviders", "google" );
+        assertNotNull(o);
         LOG.info( JsonUtils.mapToFormattedJsonString( o ) );
     }
 

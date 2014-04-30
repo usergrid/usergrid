@@ -30,6 +30,7 @@ import org.apache.usergrid.persistence.collection.mvcc.stage.write.UniqueValueSe
 import org.apache.usergrid.persistence.collection.serialization.SerializationFig;
 import org.apache.usergrid.persistence.collection.serialization.impl.SerializationModule;
 import org.apache.usergrid.persistence.collection.service.impl.ServiceModule;
+import org.apache.usergrid.persistence.core.migration.Migration;
 import org.apache.usergrid.persistence.graph.guice.GraphModule;
 import org.apache.usergrid.persistence.graph.serialization.CassandraConfig;
 import org.apache.usergrid.persistence.graph.serialization.impl.CassandraConfigImpl;
@@ -48,6 +49,7 @@ import org.apache.usergrid.persistence.map.MapSerializationImpl;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.assistedinject.FactoryModuleBuilder;
+import com.google.inject.multibindings.Multibinder;
 
 
 /**
@@ -93,6 +95,9 @@ public class GuiceModule  extends AbstractModule {
         // create a guice factory for getting our collection manager
         install( new FactoryModuleBuilder().implement( MapManager.class, MapManagerImpl.class )
                                            .build( MapFactory.class ) );
+
+        Multibinder<Migration> migrationBinding = Multibinder.newSetBinder( binder(), Migration.class );
+        migrationBinding.addBinding().to( MapSerialization.class );
 
     }    
 }

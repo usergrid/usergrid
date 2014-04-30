@@ -55,17 +55,36 @@ public class MapManagerImpl<T extends Serializable> implements MapManager<T> {
 
 
     @Override
-    public Observable<T> get( final String key ) {
+    public Object get( final String key ) {
 
-                Observable<T> derp = Observable.create( new ObservableIterator<T>( "Map" ) {
-                    @Override
-                    protected Object getObject() {
-                        return mapSerialization.getMapEntityFromSource( mapScope, key );
-                    }
-                } );
+        return mapSerialization.getMapEntityFromSource(mapScope,key  );
+
+//        return Observable.just( key ).subscribeOn( Schedulers.io() ).map( new Func1<String, String>() {
+//            @Override
+//            public T call( final String key ) {
+//=
+//                        mapSerialization.getMapEntityFromSource(mapScope,key  );
+//
+//                try {
+//                    mutation.execute();
+//                }
+//                catch ( ConnectionException e ) {
+//                    throw new RuntimeException( "Unable to connect to cassandra", e );
+//                }
+//
+//                return key;
+//            }
+//        } );
+
+//                Observable<T> derp = Observable.create( new Observable<T>( "Map" ) {
+//                    @Override
+//                    protected Object getObject() {
+//                        return mapSerialization.getMapEntityFromSource( mapScope, key );
+//                    }
+//                } );
 
        // Observable<T> derp = null;
-        return derp.last();
+        //return derp.last();
     }
 
 

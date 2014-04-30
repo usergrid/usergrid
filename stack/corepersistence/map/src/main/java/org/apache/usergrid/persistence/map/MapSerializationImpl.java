@@ -152,6 +152,14 @@ public class MapSerializationImpl<T> implements MapSerialization<T>,Migration {
         //TODO:why are we cutting out the timeouts of columnNameIterator
 
         byte[] data = result.getByteArrayValue();
+        Object o = null;
+
+        try {
+            o = objectMapper.readValue( data ,Object.class );
+        }
+        catch ( IOException e ) {
+            throw new RuntimeException( "ObjectMapper wouldn't read the object", e );
+        }
         //TODO:
 
         //final MutationBatch batch = keyspace.prepareMutationBatch();
@@ -160,7 +168,7 @@ public class MapSerializationImpl<T> implements MapSerialization<T>,Migration {
         // batch.withRow( CF_SOURCE_MAP, sourceKey ).deleteColumn( columnNameIterator.next() );
 
 
-        return null;
+        return o;
     }
 
 

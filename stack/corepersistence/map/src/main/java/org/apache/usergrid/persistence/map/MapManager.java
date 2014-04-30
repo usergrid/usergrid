@@ -27,7 +27,7 @@ public interface MapManager<T extends Serializable> {
      * @param key
      * @return
      */
-    public Observable<T> get(String key);
+    public Object get(String key);
 
 
     /**
