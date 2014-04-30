@@ -15,10 +15,6 @@
  */
 package org.apache.usergrid.corepersistence;
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.yammer.metrics.annotation.Metered;
-import static java.lang.String.CASE_INSENSITIVE_ORDER;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
@@ -28,10 +24,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
-import me.prettyprint.hector.api.mutation.Mutator;
-import rx.Observable;
 
-import static org.apache.commons.lang.StringUtils.isBlank;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.usergrid.persistence.ConnectedEntityRef;
 import org.apache.usergrid.persistence.ConnectionRef;
 import org.apache.usergrid.persistence.CounterResolution;
@@ -47,14 +43,6 @@ import org.apache.usergrid.persistence.RelationManager;
 import org.apache.usergrid.persistence.Results;
 import org.apache.usergrid.persistence.RoleRef;
 import org.apache.usergrid.persistence.Schema;
-import static org.apache.usergrid.persistence.Schema.PROPERTY_CREATED;
-import static org.apache.usergrid.persistence.Schema.PROPERTY_MODIFIED;
-import static org.apache.usergrid.persistence.Schema.PROPERTY_TIMESTAMP;
-import static org.apache.usergrid.persistence.Schema.PROPERTY_TYPE;
-import static org.apache.usergrid.persistence.Schema.PROPERTY_UUID;
-import static org.apache.usergrid.persistence.Schema.TYPE_APPLICATION;
-import static org.apache.usergrid.persistence.Schema.TYPE_ENTITY;
-import static org.apache.usergrid.persistence.Schema.getDefaultSchema;
 import org.apache.usergrid.persistence.SimpleEntityRef;
 import org.apache.usergrid.persistence.TypedEntity;
 import org.apache.usergrid.persistence.cassandra.CassandraService;
@@ -73,16 +61,38 @@ import org.apache.usergrid.persistence.exceptions.RequiredPropertyNotFoundExcept
 import org.apache.usergrid.persistence.index.EntityIndex;
 import org.apache.usergrid.persistence.index.EntityIndexFactory;
 import org.apache.usergrid.persistence.index.utils.EntityMapUtils;
+import org.apache.usergrid.persistence.map.MapManager;
+import org.apache.usergrid.persistence.map.MapManagerImpl;
+import org.apache.usergrid.persistence.map.MapScope;
+import org.apache.usergrid.persistence.map.MapScopeImpl;
+import org.apache.usergrid.persistence.map.MapSerialization;
 import org.apache.usergrid.persistence.model.entity.Id;
 import org.apache.usergrid.persistence.model.entity.SimpleId;
 import org.apache.usergrid.persistence.schema.CollectionInfo;
-import static org.apache.usergrid.utils.ConversionUtils.getLong;
 import org.apache.usergrid.utils.UUIDUtils;
+
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.yammer.metrics.annotation.Metered;
+
+import me.prettyprint.hector.api.mutation.Mutator;
+import rx.Observable;
+
+import static java.lang.String.CASE_INSENSITIVE_ORDER;
+
+import static org.apache.commons.lang.StringUtils.isBlank;
+import static org.apache.usergrid.persistence.Schema.PROPERTY_CREATED;
+import static org.apache.usergrid.persistence.Schema.PROPERTY_MODIFIED;
+import static org.apache.usergrid.persistence.Schema.PROPERTY_TIMESTAMP;
+import static org.apache.usergrid.persistence.Schema.PROPERTY_TYPE;
+import static org.apache.usergrid.persistence.Schema.PROPERTY_UUID;
+import static org.apache.usergrid.persistence.Schema.TYPE_APPLICATION;
+import static org.apache.usergrid.persistence.Schema.TYPE_ENTITY;
+import static org.apache.usergrid.persistence.Schema.getDefaultSchema;
+import static org.apache.usergrid.utils.ConversionUtils.getLong;
 import static org.apache.usergrid.utils.UUIDUtils.getTimestampInMicros;
 import static org.apache.usergrid.utils.UUIDUtils.isTimeBased;
 import static org.apache.usergrid.utils.UUIDUtils.newTimeUUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -97,14 +107,15 @@ public class CpEntityManager implements EntityManager {
     private CpEntityManagerFactory emf = new CpEntityManagerFactory();
     private EntityCollectionManagerFactory ecmf;
     private EntityIndexFactory eif;
-    private MapManager mapManager;
+    private MapSerialization mapSerialization;
 
 
     public CpEntityManager() {
         Injector injector = Guice.createInjector( new GuiceModule() );
         this.ecmf = injector.getInstance( EntityCollectionManagerFactory.class );
         this.eif = injector.getInstance( EntityIndexFactory.class );
-        this.mapManager = injector.getInstance( MapFactory.class );
+
+        this.mapSerialization = injector.getInstance( MapSerialization.class );
     }
 
     public CpEntityManager init( 

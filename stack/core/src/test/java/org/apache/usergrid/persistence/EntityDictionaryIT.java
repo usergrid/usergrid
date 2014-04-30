@@ -21,10 +21,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.usergrid.AbstractCoreIT;
+import org.apache.usergrid.CoreApplication;
 import org.apache.usergrid.cassandra.Concurrent;
 import org.apache.usergrid.persistence.entities.Application;
 import org.apache.usergrid.utils.JsonUtils;
@@ -38,6 +40,8 @@ import static org.junit.Assert.assertNotNull;
 public class EntityDictionaryIT extends AbstractCoreIT {
     private static final Logger LOG = LoggerFactory.getLogger( EntityDictionaryIT.class );
 
+    @Rule
+    public org.apache.usergrid.Application app = new CoreApplication( setup );
 
     public EntityDictionaryIT() {
         super();
@@ -61,6 +65,8 @@ public class EntityDictionaryIT extends AbstractCoreIT {
         assertNotNull( applicationId );
 
         EntityManager em = setup.getEmf().getEntityManager( applicationId );
+        em.getApplication();
+
         assertNotNull( em );
 
         em.addToDictionary( em.getApplicationRef(), "oauthproviders", "google", provider );
