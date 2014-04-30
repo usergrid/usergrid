@@ -19,6 +19,8 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.yammer.metrics.annotation.Metered;
 import static java.lang.String.CASE_INSENSITIVE_ORDER;
+
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
@@ -27,6 +29,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import me.prettyprint.hector.api.mutation.Mutator;
+import rx.Observable;
+
 import static org.apache.commons.lang.StringUtils.isBlank;
 import org.apache.usergrid.persistence.ConnectedEntityRef;
 import org.apache.usergrid.persistence.ConnectionRef;
@@ -93,12 +97,14 @@ public class CpEntityManager implements EntityManager {
     private CpEntityManagerFactory emf = new CpEntityManagerFactory();
     private EntityCollectionManagerFactory ecmf;
     private EntityIndexFactory eif;
+    private MapManager mapManager;
 
 
     public CpEntityManager() {
         Injector injector = Guice.createInjector( new GuiceModule() );
         this.ecmf = injector.getInstance( EntityCollectionManagerFactory.class );
         this.eif = injector.getInstance( EntityIndexFactory.class );
+        this.mapManager = injector.getInstance( MapFactory.class );
     }
 
     public CpEntityManager init( 
@@ -537,7 +543,26 @@ public class CpEntityManager implements EntityManager {
     @Override
     public void addToDictionary(EntityRef entityRef, String dictionaryName, 
             Object elementName, Object elementValue) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet."); 
+        OrganizationScope organizationScope = emf.getOrganizationScope(applicationId);
+        Map properties;
+        Id applicationId = new SimpleId( application.getUuid(),application.getType() );
+
+        MapScope mapScope = new MapScopeImpl( dictionaryName ,applicationId,organizationScope.getOrganization());
+
+        MapManager mm = new MapManagerImpl( mapScope,mapSerialization);
+
+        if ( !(elementName instanceof String) ) {
+            throw new IllegalArgumentException( "Element name must be a string" );
+        }
+
+        if ( !(elementValue instanceof Serializable)){
+            throw new IllegalArgumentException( "Element Value must be serializable." );
+        }
+
+
+        Observable<String> retVal = mm.put((String) elementName, ( Serializable ) elementValue );
+        String helper = retVal.toBlockingObservable().first();
+        logger.debug( "{} has been added to cassandra", helper );
     }
 
     @Override
