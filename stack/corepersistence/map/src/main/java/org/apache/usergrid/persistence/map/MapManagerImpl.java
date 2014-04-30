@@ -57,14 +57,14 @@ public class MapManagerImpl<T extends Serializable> implements MapManager<T> {
     @Override
     public Observable<T> get( final String key ) {
 
-        //        Observable<T> derp = Observable.create( new ObservableIterator<T>( "Map" ) {
-        //            @Override
-        //            protected Object getObject() {
-        //                return mapSerialization.getMapEntityFromSource( mapScope, key );
-        //            }
-        //        } );
+                Observable<T> derp = Observable.create( new ObservableIterator<T>( "Map" ) {
+                    @Override
+                    protected Object getObject() {
+                        return mapSerialization.getMapEntityFromSource( mapScope, key );
+                    }
+                } );
 
-        Observable<T> derp = null;
+       // Observable<T> derp = null;
         return derp.last();
     }
 

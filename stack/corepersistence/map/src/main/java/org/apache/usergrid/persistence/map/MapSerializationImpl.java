@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.db.marshal.BytesType;
 import org.apache.cassandra.db.marshal.UTF8Type;
 
-import org.apache.usergrid.persistence.core.astyanax.ColumnNameIterator;
 import org.apache.usergrid.persistence.core.astyanax.IdRowCompositeSerializer;
 import org.apache.usergrid.persistence.core.astyanax.MultiTennantColumnFamily;
 import org.apache.usergrid.persistence.core.astyanax.MultiTennantColumnFamilyDefinition;
@@ -161,7 +160,7 @@ public class MapSerializationImpl<T> implements MapSerialization<T>,Migration {
         // batch.withRow( CF_SOURCE_MAP, sourceKey ).deleteColumn( columnNameIterator.next() );
 
 
-        return new ColumnNameIterator<String, String>( query, PARSER, false );
+        return null;
     }
 
 

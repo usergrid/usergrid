@@ -572,8 +572,8 @@ public class CpEntityManager implements EntityManager {
 
 
         Observable<String> retVal = mm.put((String) elementName, ( Serializable ) elementValue );
-        String helper = retVal.toBlockingObservable().first();
-        logger.debug( "{} has been added to cassandra", helper );
+       // String helper = retVal.toBlockingObservable().first();
+       // logger.debug( "{} has been added to cassandra", helper );
     }
 
     @Override
@@ -597,7 +597,20 @@ public class CpEntityManager implements EntityManager {
     @Override
     public Object getDictionaryElementValue(
             EntityRef entityRef, String dictionaryName, String elementName) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet."); 
+
+        OrganizationScope organizationScope = emf.getOrganizationScope(applicationId);
+        Map properties;
+        Id applicationId = new SimpleId( application.getUuid(),application.getType() );
+
+        MapScope mapScope = new MapScopeImpl( dictionaryName ,applicationId,organizationScope.getOrganization());
+
+        MapManager mm = new MapManagerImpl( mapScope,mapSerialization);
+
+        if ( !(elementName instanceof String) ) {
+            throw new IllegalArgumentException( "Element name must be a string" );
+        }
+        return mm.get( elementName );
+
     }
 
     @Override
