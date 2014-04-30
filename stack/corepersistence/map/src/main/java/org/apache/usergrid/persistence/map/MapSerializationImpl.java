@@ -148,8 +148,6 @@ public class MapSerializationImpl<T> implements MapSerialization<T>,Migration {
         catch ( ConnectionException e ) {
             throw new RuntimeException( "Unable to connect to cassandra", e );
         }
-        //TODO: is the query string the key that we want back? How do we get items out of this wacky thing.
-        //TODO:why are we cutting out the timeouts of columnNameIterator
 
         byte[] data = result.getByteArrayValue();
         Object o = null;
@@ -160,13 +158,6 @@ public class MapSerializationImpl<T> implements MapSerialization<T>,Migration {
         catch ( IOException e ) {
             throw new RuntimeException( "ObjectMapper wouldn't read the object", e );
         }
-        //TODO:
-
-        //final MutationBatch batch = keyspace.prepareMutationBatch();
-        //
-
-        // batch.withRow( CF_SOURCE_MAP, sourceKey ).deleteColumn( columnNameIterator.next() );
-
 
         return o;
     }

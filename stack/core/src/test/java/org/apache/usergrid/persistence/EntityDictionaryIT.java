@@ -85,6 +85,7 @@ public class EntityDictionaryIT extends AbstractCoreIT {
         assertNotNull( applicationId );
 
         EntityManager em = setup.getEmf().getEntityManager( applicationId );
+        em.getApplication();
         assertNotNull( em );
 
         Map<String, Object> properties = new LinkedHashMap<String, Object>();

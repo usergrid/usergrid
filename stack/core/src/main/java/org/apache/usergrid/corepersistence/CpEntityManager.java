@@ -548,7 +548,7 @@ public class CpEntityManager implements EntityManager {
     @Override
     public void addToDictionary(
             EntityRef entityRef, String dictionaryName, Object elementValue) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet."); 
+        throw new UnsupportedOperationException("Element needs to contain a name");
     }
 
     @Override
@@ -616,7 +616,18 @@ public class CpEntityManager implements EntityManager {
     @Override
     public void removeFromDictionary(
             EntityRef entityRef, String dictionaryName, Object elementValue) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet."); 
+        OrganizationScope organizationScope = emf.getOrganizationScope(applicationId);
+        Map properties;
+        Id applicationId = new SimpleId( application.getUuid(),application.getType() );
+
+        MapScope mapScope = new MapScopeImpl( dictionaryName ,applicationId,organizationScope.getOrganization());
+
+        MapManager mm = new MapManagerImpl( mapScope,mapSerialization);
+
+        if ( !(elementValue instanceof String) ) {
+            throw new IllegalArgumentException( "Element name must be a string" );
+        }
+        mm.delete((String) elementValue );
     }
 
     @Override
