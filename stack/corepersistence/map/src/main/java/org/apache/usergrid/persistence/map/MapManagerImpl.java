@@ -57,22 +57,22 @@ public class MapManagerImpl<T extends Serializable> implements MapManager<T> {
     @Override
     public Object get( final String key ) {
 
-        return mapSerialization.getMapEntityFromSource(mapScope,key  );
+        return  mapSerialization.getMapEntityFromSource(mapScope,key  );
 
-//        return Observable.just( key ).subscribeOn( Schedulers.io() ).map( new Func1<String, String>() {
+//        return Observable.just( key ).subscribeOn( Schedulers.io() ).map( new Func1<String, T>() {
 //            @Override
 //            public T call( final String key ) {
-//=
-//                        mapSerialization.getMapEntityFromSource(mapScope,key  );
 //
-//                try {
-//                    mutation.execute();
-//                }
-//                catch ( ConnectionException e ) {
-//                    throw new RuntimeException( "Unable to connect to cassandra", e );
-//                }
+//                      //  mapSerialization.getMapEntityFromSource(mapScope,key  );
 //
-//                return key;
+////                try {
+////                    mutation.execute();
+////                }
+////                catch ( ConnectionException e ) {
+////                    throw new RuntimeException( "Unable to connect to cassandra", e );
+////                }
+//
+//                return ( T ) mapSerialization.getMapEntityFromSource(mapScope,key  );
 //            }
 //        } );
 

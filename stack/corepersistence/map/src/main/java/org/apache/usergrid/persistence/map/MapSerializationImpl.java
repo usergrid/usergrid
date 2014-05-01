@@ -139,8 +139,7 @@ public class MapSerializationImpl<T> implements MapSerialization<T>,Migration {
         Column<String> result;
 
         try {
-            result = keyspace.prepareQuery( CF_SOURCE_MAP ).getKey( sourceKey )
-                             .getColumn( key ).execute().getResult();
+            result = keyspace.prepareQuery( CF_SOURCE_MAP ).getKey( sourceKey ).getColumn( key ).execute().getResult();
         }
         catch ( NotFoundException nfe ) {
             return null;
@@ -150,17 +149,26 @@ public class MapSerializationImpl<T> implements MapSerialization<T>,Migration {
         }
 
         byte[] data = result.getByteArrayValue();
-        Object o = null;
 
         try {
-            o = objectMapper.readValue( data ,Object.class );
+            return objectMapper.readValue( data, mapScope.getEntryClass());
         }
         catch ( IOException e ) {
             throw new RuntimeException( "ObjectMapper wouldn't read the object", e );
         }
 
-        return o;
     }
+        //        Object o = null;
+//
+//        try {
+//            o = objectMapper.readValue( data ,Object.class );
+//        }
+//        catch ( IOException e ) {
+//            throw new RuntimeException( "ObjectMapper wouldn't read the object", e );
+//        }
+//
+//        return o;
+//    }
 
 
     @Override

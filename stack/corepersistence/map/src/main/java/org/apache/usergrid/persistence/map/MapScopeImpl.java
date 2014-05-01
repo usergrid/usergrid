@@ -12,7 +12,7 @@ public class MapScopeImpl implements MapScope {
     private final String name;
     private final Id owner;
     private final Id organization;
-    //Class entityClass;
+    Class entityClass;
 
 
     public MapScopeImpl (){
@@ -22,11 +22,11 @@ public class MapScopeImpl implements MapScope {
 
     }
 
-    public MapScopeImpl( final String name, final Id owner, final Id organization/*,Class storedEntityClass*/ ){
+    public MapScopeImpl( final String name, final Id owner, final Id organization,Class storedEntityClass ){
         this.name = name;
         this.owner = owner;
         this.organization = organization;
-        // this.entityClass = storedEntityClass;
+        this.entityClass = storedEntityClass;
 
     }
 
@@ -43,10 +43,10 @@ public class MapScopeImpl implements MapScope {
     }
 
 
-    //    @Override
-    //    public Class<T> getEntryClass() {
-    //        return entityClass;
-    //    }
+        @Override
+        public Class getEntryClass() {
+            return entityClass;
+        }
 
 
     @Override

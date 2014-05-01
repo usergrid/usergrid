@@ -41,10 +41,10 @@ public interface MapScope extends OrganizationScope {
      */
     public Id getOwner();
 
-    //    /**
-    //     * Get the class type of entries
-    //     * @return
-    //     */
-    //    public Class getEntryClass();
+        /**
+         * Get the class type of entries
+         * @return
+         */
+        public Class getEntryClass();
 
 }

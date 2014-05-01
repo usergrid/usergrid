@@ -108,6 +108,7 @@ public class CpEntityManager implements EntityManager {
     private EntityCollectionManagerFactory ecmf;
     private EntityIndexFactory eif;
     private MapSerialization mapSerialization;
+    private MapScope mapScope;
 
 
     public CpEntityManager() {
@@ -558,7 +559,7 @@ public class CpEntityManager implements EntityManager {
         Map properties;
         Id applicationId = new SimpleId( application.getUuid(),application.getType() );
 
-        MapScope mapScope = new MapScopeImpl( dictionaryName ,applicationId,organizationScope.getOrganization());
+        mapScope = new MapScopeImpl( dictionaryName ,applicationId,organizationScope.getOrganization(),elementValue.getClass());
 
         MapManager mm = new MapManagerImpl( mapScope,mapSerialization);
 
@@ -572,8 +573,8 @@ public class CpEntityManager implements EntityManager {
 
 
         Observable<String> retVal = mm.put((String) elementName, ( Serializable ) elementValue );
-       // String helper = retVal.toBlockingObservable().first();
-       // logger.debug( "{} has been added to cassandra", helper );
+        String helper = retVal.toBlockingObservable().last();
+        logger.debug( "{} has been added to cassandra", helper );
     }
 
     @Override
@@ -598,12 +599,6 @@ public class CpEntityManager implements EntityManager {
     public Object getDictionaryElementValue(
             EntityRef entityRef, String dictionaryName, String elementName) throws Exception {
 
-        OrganizationScope organizationScope = emf.getOrganizationScope(applicationId);
-        Map properties;
-        Id applicationId = new SimpleId( application.getUuid(),application.getType() );
-
-        MapScope mapScope = new MapScopeImpl( dictionaryName ,applicationId,organizationScope.getOrganization());
-
         MapManager mm = new MapManagerImpl( mapScope,mapSerialization);
 
         if ( !(elementName instanceof String) ) {
@@ -616,11 +611,6 @@ public class CpEntityManager implements EntityManager {
     @Override
     public void removeFromDictionary(
             EntityRef entityRef, String dictionaryName, Object elementValue) throws Exception {
-        OrganizationScope organizationScope = emf.getOrganizationScope(applicationId);
-        Map properties;
-        Id applicationId = new SimpleId( application.getUuid(),application.getType() );
-
-        MapScope mapScope = new MapScopeImpl( dictionaryName ,applicationId,organizationScope.getOrganization());
 
         MapManager mm = new MapManagerImpl( mapScope,mapSerialization);
 

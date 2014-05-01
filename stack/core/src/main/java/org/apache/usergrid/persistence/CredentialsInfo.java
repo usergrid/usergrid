@@ -32,7 +32,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 
 @XmlRootElement
-@JsonTypeInfo( use= JsonTypeInfo.Id.MINIMAL_CLASS,include= JsonTypeInfo.As.WRAPPER_OBJECT,property="@class" )
+@JsonTypeInfo( use= JsonTypeInfo.Id.CLASS,include= JsonTypeInfo.As.WRAPPER_OBJECT,property="@class" )
 
 public class CredentialsInfo implements Comparable<CredentialsInfo>,Serializable {
 
