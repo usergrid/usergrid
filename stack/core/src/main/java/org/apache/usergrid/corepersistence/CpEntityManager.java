@@ -15,8 +15,9 @@
  */
 package org.apache.usergrid.corepersistence;
 
-
 import java.io.Serializable;
+import com.yammer.metrics.annotation.Metered;
+import static java.lang.String.CASE_INSENSITIVE_ORDER;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
@@ -35,6 +36,7 @@ import org.apache.usergrid.persistence.DynamicEntity;
 import org.apache.usergrid.persistence.Entity;
 import org.apache.usergrid.persistence.EntityFactory;
 import org.apache.usergrid.persistence.EntityManager;
+import org.apache.usergrid.persistence.EntityManagerFactory;
 import org.apache.usergrid.persistence.EntityRef;
 import org.apache.usergrid.persistence.Identifier;
 import org.apache.usergrid.persistence.IndexBucketLocator;
@@ -46,20 +48,19 @@ import org.apache.usergrid.persistence.Schema;
 import org.apache.usergrid.persistence.SimpleEntityRef;
 import org.apache.usergrid.persistence.TypedEntity;
 import org.apache.usergrid.persistence.cassandra.CassandraService;
-import org.apache.usergrid.persistence.cassandra.CounterUtils;
 import org.apache.usergrid.persistence.cassandra.GeoIndexManager;
 import org.apache.usergrid.persistence.cassandra.util.TraceParticipant;
 import org.apache.usergrid.persistence.collection.CollectionScope;
 import org.apache.usergrid.persistence.collection.EntityCollectionManager;
-import org.apache.usergrid.persistence.collection.EntityCollectionManagerFactory;
+import org.apache.usergrid.persistence.collection.exception.WriteUniqueVerifyException;
 import org.apache.usergrid.persistence.collection.impl.CollectionScopeImpl;
 import org.apache.usergrid.persistence.core.scope.OrganizationScope;
 import org.apache.usergrid.persistence.entities.Application;
 import org.apache.usergrid.persistence.entities.Event;
 import org.apache.usergrid.persistence.entities.Role;
+import org.apache.usergrid.persistence.exceptions.DuplicateUniquePropertyExistsException;
 import org.apache.usergrid.persistence.exceptions.RequiredPropertyNotFoundException;
 import org.apache.usergrid.persistence.index.EntityIndex;
-import org.apache.usergrid.persistence.index.EntityIndexFactory;
 import org.apache.usergrid.persistence.index.utils.EntityMapUtils;
 import org.apache.usergrid.persistence.map.MapManager;
 import org.apache.usergrid.persistence.map.MapManagerImpl;
@@ -68,17 +69,15 @@ import org.apache.usergrid.persistence.map.MapScopeImpl;
 import org.apache.usergrid.persistence.map.MapSerialization;
 import org.apache.usergrid.persistence.model.entity.Id;
 import org.apache.usergrid.persistence.model.entity.SimpleId;
+import org.apache.usergrid.persistence.model.field.Field;
 import org.apache.usergrid.persistence.schema.CollectionInfo;
 import org.apache.usergrid.utils.UUIDUtils;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.yammer.metrics.annotation.Metered;
 
 import me.prettyprint.hector.api.mutation.Mutator;
 import rx.Observable;
-
-import static java.lang.String.CASE_INSENSITIVE_ORDER;
 
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.usergrid.persistence.Schema.PROPERTY_CREATED;
@@ -105,39 +104,35 @@ public class CpEntityManager implements EntityManager {
     private Application application;
     
     private CpEntityManagerFactory emf = new CpEntityManagerFactory();
-    private EntityCollectionManagerFactory ecmf;
-    private EntityIndexFactory eif;
     private MapSerialization mapSerialization;
     private MapScope mapScope;
 
+    private CpManagerCache managerCache;
 
     public CpEntityManager() {
         Injector injector = Guice.createInjector( new GuiceModule() );
-        this.ecmf = injector.getInstance( EntityCollectionManagerFactory.class );
-        this.eif = injector.getInstance( EntityIndexFactory.class );
-
         this.mapSerialization = injector.getInstance( MapSerialization.class );
     }
 
-    public CpEntityManager init( 
-            CpEntityManagerFactory emf, CassandraService cass, CounterUtils counterUtils,
-            UUID applicationId, boolean skipAggregateCounters ) {
 
-        this.emf = emf;
+    @Override
+    public void init( EntityManagerFactory emf, UUID applicationId ) {
+
+        this.emf = (CpEntityManagerFactory)emf;
+        this.managerCache = this.emf.getManagerCache();
         this.applicationId = applicationId;
 
-//        this.cass = cass;
-//        this.counterUtils = counterUtils;
-//        this.skipAggregateCounters = skipAggregateCounters;
-
-        // prime the application entity for the EM
         try {
             application = getApplication();
         }
         catch ( Exception ex ) {
-            ex.printStackTrace();
+            logger.error("Getting application", ex);
         }
-        return this;
+    }
+
+
+    public CpManagerCache getManagerCache() {
+        return managerCache;
     }
 
 
@@ -226,7 +221,7 @@ public class CpEntityManager implements EntityManager {
             applicationScope.getOwner(), 
             collectionName );
 
-        EntityCollectionManager ecm = ecmf.createCollectionManager(collectionScope);
+        EntityCollectionManager ecm = managerCache.getEntityCollectionManager(collectionScope);
 
 //        logger.debug("Loading entity {} type {} to {}", 
 //            new String[] { entityId.toString(), type, collectionName });
@@ -289,7 +284,7 @@ public class CpEntityManager implements EntityManager {
             applicationScope.getOwner(), 
             collectionName );
 
-        EntityCollectionManager ecm = ecmf.createCollectionManager(collectionScope);
+        EntityCollectionManager ecm = managerCache.getEntityCollectionManager(collectionScope);
 
 //        logger.debug("Loading entity {} type {} to {}", 
 //            new String[] { entityId.toString(), type, collectionName });
@@ -337,18 +332,19 @@ public class CpEntityManager implements EntityManager {
     @Override
     public void update( Entity entity ) throws Exception {
 
+        // first, update entity index in its own collection scope
+
         String collectionName = Schema.defaultCollectionName( entity.getType() );
 
         OrganizationScope organizationScope = emf.getOrganizationScope(applicationId);
         CollectionScope applicationScope = emf.getApplicationScope(applicationId);
-
         CollectionScope collectionScope = new CollectionScopeImpl( 
             applicationScope.getOrganization(), 
             applicationScope.getOwner(), 
             collectionName );
 
-        EntityCollectionManager ecm = ecmf.createCollectionManager(collectionScope);
-        EntityIndex ei = eif.createEntityIndex(organizationScope, applicationScope);
+        EntityCollectionManager ecm = managerCache.getEntityCollectionManager(collectionScope);
+        EntityIndex ei = managerCache.getEntityIndex(organizationScope, applicationScope);
 
         Id entityId = new SimpleId( entity.getUuid(), entity.getType() );
 
@@ -359,11 +355,44 @@ public class CpEntityManager implements EntityManager {
 
         cpEntity = ecm.write( cpEntity ).toBlockingObservable().last();
         ei.index( collectionScope, cpEntity );
+
+        // next, update entity in every collection and connection scope in which it is indexed 
+
+        RelationManager rm = getRelationManager( entity );
+        Map<String, Map<UUID, Set<String>>> owners = rm.getOwners();
+
+        logger.debug("Updating indexes of all {} collections owning the entity", owners.keySet().size());
+
+        for ( String ownerType : owners.keySet() ) {
+            Map<UUID, Set<String>> collectionsByUuid = owners.get( ownerType );
+
+            for ( UUID uuid : collectionsByUuid.keySet() ) {
+                Set<String> collections = collectionsByUuid.get( uuid );
+                for ( String collection : collections ) {
+
+                    CollectionScope ownerScope = new CollectionScopeImpl( 
+                        applicationScope.getOrganization(), 
+                        applicationScope.getOwner(), 
+                        Schema.defaultCollectionName( ownerType ) );
+
+                    EntityCollectionManager ownerEcm = managerCache.getEntityCollectionManager(ownerScope);
+
+                    org.apache.usergrid.persistence.model.entity.Entity cpOwner = 
+                        ownerEcm.load( new SimpleId( uuid, ownerType )).toBlockingObservable().last();
+
+                    ei.indexConnection(cpOwner, 
+                        collection+CpRelationManager.COLLECTION_SUFFIX, cpEntity, collectionScope);
+                }
+            }
+        }
+
     }
 
 
     @Override
     public void delete(EntityRef entityRef) throws Exception {
+
+        // first, delete entity index in its own collection scope
 
         String collectionName = Schema.defaultCollectionName( entityRef.getType() );
 
@@ -375,8 +404,8 @@ public class CpEntityManager implements EntityManager {
             applicationScope.getOwner(), 
             collectionName );
 
-        EntityCollectionManager ecm = ecmf.createCollectionManager(collectionScope);
-        EntityIndex ei = eif.createEntityIndex(organizationScope, applicationScope);
+        EntityCollectionManager ecm = managerCache.getEntityCollectionManager(collectionScope);
+        EntityIndex ei = managerCache.getEntityIndex(organizationScope, applicationScope);
 
         Id entityId = new SimpleId( entityRef.getUuid(), entityRef.getType() );
 
@@ -387,6 +416,9 @@ public class CpEntityManager implements EntityManager {
             ei.deindex( collectionScope, entity );
             ecm.delete( entityId ).toBlockingObservable().last();
         }
+
+        // TODO: next, delete entity in every collection and connection scope in which it is indexed 
+
     }
 
 
@@ -1167,12 +1199,8 @@ public class CpEntityManager implements EntityManager {
             return entity;
         }
 
-        // create Core Persistence Entity from those properties
-        org.apache.usergrid.persistence.model.entity.Entity cpEntity = 
-            new org.apache.usergrid.persistence.model.entity.Entity(
-                new SimpleId(itemId, entityType ));
-
-        cpEntity = EntityMapUtils.fromMap( cpEntity, properties );
+        // TODO: need to create fields as unique for some fields
+        org.apache.usergrid.persistence.model.entity.Entity cpEntity = entityToCpEntity( entity ); 
 
         // prepare to write and index Core Persistence Entity into correct scope
         OrganizationScope organizationScope = emf.getOrganizationScope(applicationId);
@@ -1182,10 +1210,21 @@ public class CpEntityManager implements EntityManager {
             applicationScope.getOwner(), 
             collectionName );
 
-        EntityCollectionManager ecm = ecmf.createCollectionManager(collectionScope);
-        EntityIndex ei = eif.createEntityIndex(organizationScope, applicationScope);
+        EntityCollectionManager ecm = managerCache.getEntityCollectionManager(collectionScope);
+        EntityIndex ei = managerCache.getEntityIndex(organizationScope, applicationScope);
 
-        cpEntity = ecm.write( cpEntity ).toBlockingObservable().last();
+        try {
+            cpEntity = ecm.write( cpEntity ).toBlockingObservable().last();
+
+        } catch (WriteUniqueVerifyException wuve) {
+
+            // we may have multiple conflicts, but caller expects only one 
+            Map<String, Field> violiations = wuve.getVioliations();
+            Field conflict = violiations.get( violiations.keySet().iterator().next() );
+
+            throw new DuplicateUniquePropertyExistsException( 
+                entity.getType(), conflict.getName(), conflict.getValue());
+        }
         ei.index( collectionScope, cpEntity );
 
         // reflect changes in the legacy Entity
@@ -1260,7 +1299,7 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public UUID getApplicationId() {
-        throw new UnsupportedOperationException("Not supported yet."); 
+        return applicationId;
     }
 
     @Override
@@ -1272,20 +1311,36 @@ public class CpEntityManager implements EntityManager {
     public CassandraService getCass() {
         throw new UnsupportedOperationException("Not supported yet."); 
     }
-   
+  
+
     @Override
     public void refreshIndex() {
 
         // refresh system entity index
-        EntityIndex sei = eif.createEntityIndex(
+        EntityIndex sei = managerCache.getEntityIndex(
             CpEntityManagerFactory.SYSTEM_ORG_SCOPE, CpEntityManagerFactory.SYSTEM_APPS_SCOPE);
         sei.refresh();
 
         // refresh application entity index
-        EntityIndex aei = eif.createEntityIndex(
+        EntityIndex aei = managerCache.getEntityIndex(
             emf.getOrganizationScope(applicationId), emf.getApplicationScope(applicationId));
         aei.refresh();
 
         logger.debug("Refreshed index for system and application: " + applicationId);
     }
+
+
+    private org.apache.usergrid.persistence.model.entity.Entity entityToCpEntity( Entity entity) {
+
+        org.apache.usergrid.persistence.model.entity.Entity cpEntity = 
+            new org.apache.usergrid.persistence.model.entity.Entity(
+                new SimpleId( entity.getUuid(), entity.getType() ));
+
+        // TODO: can't just do this, some fields MUST be marked as unique
+        cpEntity  = EntityMapUtils.fromMap( cpEntity, entity.getProperties() );
+
+        return cpEntity;
+    }
 }
+
+

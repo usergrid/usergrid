@@ -15,24 +15,22 @@
  */
 package org.apache.usergrid.corepersistence;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.yammer.metrics.annotation.Metered;
-import static java.lang.String.CASE_INSENSITIVE_ORDER;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeansException;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+
 import org.apache.commons.lang.StringUtils;
+
 import org.apache.usergrid.persistence.DynamicEntity;
 import org.apache.usergrid.persistence.EntityManager;
 import org.apache.usergrid.persistence.EntityManagerFactory;
-import static org.apache.usergrid.persistence.Schema.PROPERTY_NAME;
-import static org.apache.usergrid.persistence.Schema.PROPERTY_UUID;
-import static org.apache.usergrid.persistence.Schema.TYPE_APPLICATION;
 import org.apache.usergrid.persistence.collection.CollectionScope;
 import org.apache.usergrid.persistence.collection.EntityCollectionManager;
 import org.apache.usergrid.persistence.collection.EntityCollectionManagerFactory;
@@ -40,6 +38,7 @@ import org.apache.usergrid.persistence.collection.impl.CollectionScopeImpl;
 import org.apache.usergrid.persistence.core.scope.OrganizationScope;
 import org.apache.usergrid.persistence.core.scope.OrganizationScopeImpl;
 import org.apache.usergrid.persistence.exceptions.ApplicationAlreadyExistsException;
+import org.apache.usergrid.persistence.graph.GraphManagerFactory;
 import org.apache.usergrid.persistence.index.EntityIndex;
 import org.apache.usergrid.persistence.index.EntityIndexFactory;
 import org.apache.usergrid.persistence.index.query.Query;
@@ -50,11 +49,18 @@ import org.apache.usergrid.persistence.model.field.Field;
 import org.apache.usergrid.persistence.model.field.StringField;
 import org.apache.usergrid.persistence.model.field.UUIDField;
 import org.apache.usergrid.persistence.model.util.UUIDGenerator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeansException;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationContextAware;
+
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.inject.Injector;
+import com.yammer.metrics.annotation.Metered;
+
+import static java.lang.String.CASE_INSENSITIVE_ORDER;
+
+import static org.apache.usergrid.persistence.Schema.PROPERTY_NAME;
+import static org.apache.usergrid.persistence.Schema.PROPERTY_UUID;
+import static org.apache.usergrid.persistence.Schema.TYPE_APPLICATION;
 
 
 /**
@@ -68,9 +74,6 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
     public static String IMPLEMENTATION_DESCRIPTION = "Core Persistence Entity Manager Factory 1.0";
 
     private ApplicationContext applicationContext;
-
-    private EntityCollectionManagerFactory ecmf;
-    private EntityIndexFactory ecif;
 
     public static final Class<DynamicEntity> APPLICATION_ENTITY_CLASS = DynamicEntity.class;
 
@@ -122,10 +125,30 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
         });
 
 
-    public CpEntityManagerFactory() {
-        Injector injector = Guice.createInjector( new GuiceModule() );
-        ecmf = injector.getInstance( EntityCollectionManagerFactory.class );
-        ecif = injector.getInstance( EntityIndexFactory.class );
+    private CpManagerCache managerCache;
+
+
+    public CpEntityManagerFactory() {}
+    
+
+    public CpManagerCache getManagerCache() {
+
+        if ( managerCache == null ) {
+
+            // TODO: better solution for getting injector? 
+            Injector injector = CpSetup.getInjector();
+
+            EntityCollectionManagerFactory ecmf;
+            EntityIndexFactory eif;
+            GraphManagerFactory gmf;
+
+            ecmf = injector.getInstance( EntityCollectionManagerFactory.class );
+            eif = injector.getInstance( EntityIndexFactory.class );
+            gmf = injector.getInstance( GraphManagerFactory.class );
+
+            managerCache = new CpManagerCache( ecmf, eif, gmf );
+        }
+        return managerCache;
     }
 
 
@@ -149,7 +172,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
     
     private EntityManager _getEntityManager( UUID applicationId ) {
         EntityManager em = applicationContext.getBean( "entityManager", EntityManager.class );
-        em.setApplicationId( applicationId );
+        em.init( this, applicationId );
         return em;
     }
 
@@ -173,7 +196,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
         }
 
         applicationId = UUIDGenerator.newTimeUUID();
-        logger.info( "New application id " + applicationId.toString() );
+        logger.debug( "New application id " + applicationId.toString() );
 
         initializeApplication( orgName, applicationId, appName, properties );
         return applicationId;
@@ -208,8 +231,8 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
             orgInfoEntity.setField( new StringField( PROPERTY_NAME, name ));
             orgInfoEntity.setField( new UUIDField( PROPERTY_UUID, orgUuid ));
 
-            EntityCollectionManager ecm = ecmf.createCollectionManager( SYSTEM_ORGS_SCOPE );
-            EntityIndex eci = ecif.createEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_ORGS_SCOPE );
+            EntityCollectionManager ecm = getManagerCache().getEntityCollectionManager(SYSTEM_ORGS_SCOPE );
+            EntityIndex eci = getManagerCache().getEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_ORGS_SCOPE );
 
             orgInfoEntity = ecm.write( orgInfoEntity ).toBlockingObservable().last();
             eci.index( SYSTEM_ORGS_SCOPE, orgInfoEntity );
@@ -230,8 +253,8 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
 
         // create app in system app scope
         {
-            EntityCollectionManager ecm = ecmf.createCollectionManager( SYSTEM_APPS_SCOPE );
-            EntityIndex eci = ecif.createEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_APPS_SCOPE );
+            EntityCollectionManager ecm = getManagerCache().getEntityCollectionManager( SYSTEM_APPS_SCOPE );
+            EntityIndex eci = getManagerCache().getEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_APPS_SCOPE );
 
             appInfoEntity = ecm.write( appInfoEntity ).toBlockingObservable().last();
             eci.index( SYSTEM_APPS_SCOPE, appInfoEntity );
@@ -251,7 +274,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
 
         Query q = Query.fromQL( PROPERTY_UUID + " = '" + applicationId.toString() + "'");
 
-        EntityIndex ei = ecif.createEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_APPS_SCOPE );
+        EntityIndex ei = getManagerCache().getEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_APPS_SCOPE );
         org.apache.usergrid.persistence.index.query.Results results = 
             ei.search( SYSTEM_APPS_SCOPE, q );
 
@@ -270,7 +293,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
 
         Query q = Query.fromQL( PROPERTY_UUID + " = '" + applicationId.toString() + "'");
 
-        EntityIndex ei = ecif.createEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_APPS_SCOPE );
+        EntityIndex ei = getManagerCache().getEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_APPS_SCOPE );
         Results results = ei.search( SYSTEM_APPS_SCOPE, q );
 
         if ( results.isEmpty() ) {
@@ -299,7 +322,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
 
         Query q = Query.fromQL(PROPERTY_NAME + " = '" + name + "'");
 
-        EntityIndex ei = ecif.createEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_ORGS_SCOPE );
+        EntityIndex ei = getManagerCache().getEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_ORGS_SCOPE );
         Results results = ei.search( SYSTEM_ORGS_SCOPE, q );
 
         if ( results.isEmpty() ) {
@@ -315,7 +338,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
 
         Query q = Query.fromQL( PROPERTY_NAME + " = '" + name + "'");
 
-        EntityIndex ei = ecif.createEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_APPS_SCOPE );
+        EntityIndex ei = getManagerCache().getEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_APPS_SCOPE );
         org.apache.usergrid.persistence.index.query.Results results = 
             ei.search( SYSTEM_APPS_SCOPE, q );
 
@@ -333,7 +356,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
 
         Query q = Query.fromQL("select *");
 
-        EntityIndex ei = ecif.createEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_APPS_SCOPE );
+        EntityIndex ei = getManagerCache().getEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_APPS_SCOPE );
         Results results = ei.search( SYSTEM_APPS_SCOPE, q );
 
         Map<String, UUID> appMap = new HashMap<String, UUID>();
@@ -357,7 +380,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
     public Map<String, String> getServiceProperties() {
 
         Query q = Query.fromQL("select *");
-        EntityIndex ei = ecif.createEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_PROPS_SCOPE );
+        EntityIndex ei = getManagerCache().getEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_PROPS_SCOPE );
         Results results = ei.search( SYSTEM_PROPS_SCOPE, q );
         if ( results.isEmpty() ) {
             return new HashMap<String,String>();
@@ -379,8 +402,8 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
     @Override
     public boolean updateServiceProperties(Map<String, String> properties) {
 
-        EntityCollectionManager ecm = ecmf.createCollectionManager( SYSTEM_PROPS_SCOPE );
-        EntityIndex ei = ecif.createEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_PROPS_SCOPE );
+        EntityCollectionManager ecm = getManagerCache().getEntityCollectionManager( SYSTEM_PROPS_SCOPE );
+        EntityIndex ei = getManagerCache().getEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_PROPS_SCOPE );
 
         Query q = Query.fromQL("select *");
         Results results = ei.search( SYSTEM_PROPS_SCOPE, q );
@@ -415,8 +438,8 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
     @Override
     public boolean deleteServiceProperty(String name) {
 
-        EntityCollectionManager ecm = ecmf.createCollectionManager( SYSTEM_PROPS_SCOPE );
-        EntityIndex ei = ecif.createEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_PROPS_SCOPE );
+        EntityCollectionManager ecm = getManagerCache().getEntityCollectionManager( SYSTEM_PROPS_SCOPE );
+        EntityIndex ei = getManagerCache().getEntityIndex( SYSTEM_ORG_SCOPE, SYSTEM_PROPS_SCOPE );
 
         Query q = Query.fromQL("select *");
         Results results = ei.search( SYSTEM_PROPS_SCOPE, q );
@@ -444,6 +467,13 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
     @Override
     public void setApplicationContext( ApplicationContext applicationContext ) throws BeansException {
         this.applicationContext = applicationContext;
+    }
+
+    /**
+     * @param managerCache the managerCache to set
+     */
+    public void setManagerCache(CpManagerCache managerCache) {
+        this.managerCache = managerCache;
     }
 
 }
