@@ -17,6 +17,15 @@
 package org.apache.usergrid.rest.applications.users;
 
 
+import static org.apache.usergrid.rest.applications.utils.TestUtils.getIdFromSearchResults;
+import static org.apache.usergrid.utils.MapUtils.hashMap;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -26,34 +35,27 @@ import java.util.UUID;
 
 import javax.ws.rs.core.MediaType;
 
+import org.apache.usergrid.cassandra.Concurrent;
+import org.apache.usergrid.management.ApplicationInfo;
+import org.apache.usergrid.management.OrganizationInfo;
+import org.apache.usergrid.persistence.EntityManager;
+import org.apache.usergrid.persistence.entities.Application;
+import org.apache.usergrid.rest.AbstractRestIT;
+import org.apache.usergrid.rest.applications.utils.UserRepo;
+import org.apache.usergrid.utils.UUIDUtils;
 import org.codehaus.jackson.JsonNode;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.usergrid.cassandra.Concurrent;
 import org.usergrid.java.client.Client.Query;
 import org.usergrid.java.client.entities.Activity;
 import org.usergrid.java.client.entities.Activity.ActivityObject;
 import org.usergrid.java.client.entities.Entity;
 import org.usergrid.java.client.entities.User;
 import org.usergrid.java.client.response.ApiResponse;
-import org.apache.usergrid.management.ApplicationInfo;
-import org.apache.usergrid.management.OrganizationInfo;
-import org.apache.usergrid.rest.AbstractRestIT;
-import org.apache.usergrid.rest.applications.utils.UserRepo;
-import org.apache.usergrid.utils.UUIDUtils;
 
 import com.sun.jersey.api.client.ClientResponse.Status;
 import com.sun.jersey.api.client.UniformInterfaceException;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.apache.usergrid.rest.applications.utils.TestUtils.getIdFromSearchResults;
-import static org.apache.usergrid.utils.MapUtils.hashMap;
 
 
 /**
@@ -1284,4 +1286,113 @@ public class UserResourceIT extends AbstractRestIT {
             assertNull( "Entities must not exist", response.get( "entries" ) );
         }
     }
+
+    @Test
+    public void activationOverrideAsAdminUser() throws Exception {
+
+        // The following four scenarios are considered for this test:
+        //
+        // Scenario 1: registrationRequiresEmailConfirmation = false and
+        //             activation flag is NOT overridden
+        //    Result: activated property = true
+
+        assertTrue( "Activated flag should be set to 'true'", createUserForActivationOverrideTest( true, null, false ) );
+
+        // Scenario 2: registrationRequiresEmailConfirmation = true
+        //             activation flag is NOT overriden
+        //    Result: activated property = false
+
+        assertFalse( "Activated flag should be set to 'false'", createUserForActivationOverrideTest( true, null, true ) );
+
+        // Scenario 3: registrationRequiresEmailConfirmation = false and
+        //             activation flag is overridden by admin (set to false)
+        //    Result: activated property = false
+
+        assertFalse( "Activated flag should be set to 'false'", createUserForActivationOverrideTest( true, false, false ) );
+
+        // Scenario 4: registrationRequiresEmailConfirmation = true and
+        //             activation flag is overridden by admin (set to true)
+        //    Result: activated property = true
+
+        assertTrue( "Activated flag should be set to 'true'", createUserForActivationOverrideTest( true, true, true ) );
+
+    }
+
+    @Test
+    public void activationOverrideAsNonAdminUser() throws Exception {
+
+        // The following four scenarios are considered for this test:
+        //
+        // Scenario 1: registrationRequiresEmailConfirmation = false and
+        //             activation flag is NOT overridden
+        //    Result: activated property = true
+
+        assertTrue( "Activated flag should be set to 'true'", createUserForActivationOverrideTest( false, null, false ) );
+
+        // Scenario 2: registrationRequiresEmailConfirmation = true
+        //             activation flag is NOT overriden
+        //    Result: activated property = false
+
+        assertFalse( "Activated flag should be set to 'false'", createUserForActivationOverrideTest( false, null, true ) );
+
+        // Scenario 3: registrationRequiresEmailConfirmation = false and
+        //             activation flag is attempted to be overridden by non-admin user (set to false)
+        //    Result: activated property = true
+
+        assertTrue( "Activated flag should be set to 'true'", createUserForActivationOverrideTest( false, false, false ) );
+
+        // Scenario 4: registrationRequiresEmailConfirmation = true and
+        //             activation flag is attempted to be overridden by non-admin user (set to true)
+        //    Result: activated property = false
+
+        assertFalse( "Activated flag should be set to 'false'", createUserForActivationOverrideTest( false, true, true ) );
+
+    }
+
+    private boolean createUserForActivationOverrideTest( boolean adminUser, Boolean activatedFlag , 
+            Boolean emailConfirmationFlag ) throws Exception {
+
+        UUID id = UUIDUtils.newTimeUUID();
+
+        String username = "username-" + id + "@usergrid.org";
+        String name = "name" + id;
+        String email = "email" + id + "@usergrid.org";
+
+        Map<String, String> payload = hashMap( "email", email ).map( "username", username )
+                .map( "name", name ).map( "password", "password" )
+                .map( "pin", "1234" );
+
+        // Pass in the activation property at user creation time. Overriding of the activated property
+        // in this way only works for admin users.
+        if ( activatedFlag != null ) {
+            payload.put( "activated", activatedFlag.toString() );
+        }
+
+        setRegistrationRequiresEmailConfirmationProperty( emailConfirmationFlag );
+
+        String accessToken = access_token;
+        if ( adminUser ) {
+            accessToken = adminAccessToken;
+        }
+
+        JsonNode response = resource().path( "/test-organization/test-app/users" ).queryParam( "access_token", accessToken )
+                .accept( MediaType.APPLICATION_JSON ).type( MediaType.APPLICATION_JSON_TYPE )
+                .post( JsonNode.class, payload );
+
+        return response.get("entities").get(0).get("activated").asBoolean();
+
+    }
+
+    private void setRegistrationRequiresEmailConfirmationProperty(boolean value) throws Exception {
+
+        ApplicationInfo appInfo = setup.getMgmtSvc().getApplicationInfo( "test-organization/test-app" );
+
+        EntityManager em = setup.getEmf().getEntityManager( appInfo.getId() );
+        Application application = em.get( appInfo.getId(), Application.class );
+
+        application.setRegistrationRequiresEmailConfirmation( value );
+        em.update( application );
+
+    }
+
 }
