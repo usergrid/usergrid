@@ -50,6 +50,7 @@ import org.apache.usergrid.rest.ApiResponse;
 import org.apache.usergrid.rest.applications.ServiceResource;
 import org.apache.usergrid.rest.exceptions.RedirectionException;
 import org.apache.usergrid.rest.security.annotations.RequireApplicationAccess;
+import org.apache.usergrid.security.shiro.utils.SubjectUtils;
 
 import com.sun.jersey.api.json.JSONWithPadding;
 import com.sun.jersey.api.view.Viewable;
@@ -57,7 +58,6 @@ import com.sun.jersey.core.provider.EntityHolder;
 
 import net.tanesha.recaptcha.ReCaptchaImpl;
 import net.tanesha.recaptcha.ReCaptchaResponse;
-
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
 import static org.apache.usergrid.services.ServiceParameter.addParameter;
@@ -215,6 +215,7 @@ public class UsersResource extends ServiceResource {
         Object json = body.getEntity();
         String password = null;
         String pin = null;
+        String activatedProperty = null;
 
         Boolean registration_requires_email_confirmation = ( Boolean ) this.getServices().getEntityManager()
                                                                            .getProperty( this.getServices()
@@ -223,13 +224,23 @@ public class UsersResource extends ServiceResource {
         boolean activated =
                 !( ( registration_requires_email_confirmation != null ) && registration_requires_email_confirmation );
 
+        boolean isAdmin = SubjectUtils.isAdminUser() || SubjectUtils.isApplicationAdmin()
+                || SubjectUtils.isServiceAdmin() || SubjectUtils.isOrganizationAdmin();
+
         if ( json instanceof Map ) {
             @SuppressWarnings("unchecked") Map<String, Object> map = ( Map<String, Object> ) json;
             password = ( String ) map.get( "password" );
             map.remove( "password" );
             pin = ( String ) map.get( "pin" );
             map.remove( "pin" );
-            map.put( "activated", activated );
+            activatedProperty = ( String ) map.get( "activated" );
+
+            // Allow the activated property to be overridden for admins
+            if ( isAdmin && activatedProperty != null ) {
+                activated = Boolean.parseBoolean( activatedProperty );
+            }
+
+            map.put("activated", activated);
         }
         else if ( json instanceof List ) {
             @SuppressWarnings("unchecked") List<Object> list = ( List<Object> ) json;
@@ -238,6 +249,15 @@ public class UsersResource extends ServiceResource {
                     @SuppressWarnings("unchecked") Map<String, Object> map = ( Map<String, Object> ) obj;
                     map.remove( "password" );
                     map.remove( "pin" );
+                    activatedProperty = ( String ) map.get( "activated" );
+
+                    // Allow the activated property to be overridden for admins
+                    if ( isAdmin && activatedProperty != null ) {
+                        activated = Boolean.parseBoolean( activatedProperty );
+                    }
+
+                    map.put("activated", activated);
+
                 }
             }
         }
