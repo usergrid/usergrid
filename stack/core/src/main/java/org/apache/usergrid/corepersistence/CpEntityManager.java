@@ -1187,7 +1187,9 @@ public class CpEntityManager implements EntityManager {
 
     @Override
     public void removeFromCollection( EntityRef entityRef, String collectionName, EntityRef itemRef ) throws Exception {
-        throw new UnsupportedOperationException( "Not supported yet." );
+
+        getRelationManager( entityRef ).removeFromCollection( collectionName,itemRef );
+
     }
 
 
