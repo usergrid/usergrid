@@ -47,6 +47,7 @@ import org.apache.usergrid.persistence.index.IndexScope;
 import org.apache.usergrid.persistence.index.guice.TestIndexModule;
 import org.apache.usergrid.persistence.index.query.CandidateResults;
 import org.apache.usergrid.persistence.index.query.Query;
+import org.apache.usergrid.persistence.index.utils.MapUtils;
 import org.apache.usergrid.persistence.index.utils.UUIDUtils;
 import org.apache.usergrid.persistence.model.entity.Entity;
 import org.apache.usergrid.persistence.model.entity.Id;
@@ -160,6 +161,114 @@ public class EntityIndexTest extends BaseIT {
 
         candidateResults = entityIndex.search( Query.fromQL( "name contains 'Ferrari*'" ) );
         assertEquals( 0, candidateResults.size() );
+    }
+
+    @Test
+    public void testLocationIndex() {
+
+        Id appId = new SimpleId( "application" );
+        IndexScope indexScope = new IndexScopeImpl( appId, appId, "fastcars" );
+
+        EntityIndex entityIndex = cif.createEntityIndex( indexScope );
+
+        float latitude = 48.38626f;
+        float longtitude = 9.94175f;
+        int distance = 10;
+
+        final Map<String, Float> location = MapUtils.hashMap( "latitude", latitude ).map( "longitude", longtitude );
+
+
+        Map entityMap = new HashMap() {{
+            put( "name", "Ferrari 212 Inter" );
+            put( "introduced", 1952 );
+            put( "topspeed", 215 );
+            put( "location", location);
+        }};
+
+
+        Entity entity = EntityIndexMapUtils.fromMap( entityMap );
+        EntityUtils.setId( entity, new SimpleId( "fastcar" ) );
+        EntityUtils.setVersion( entity, UUIDGenerator.newTimeUUID() );
+        entityIndex.index( entity );
+
+        entityIndex.refresh();
+
+        CandidateResults candidateResults;
+
+        Query query = Query.fromQL( "select * where location within "
+                + distance + " of " + latitude + ", " + longtitude);
+
+        candidateResults = entityIndex.search( query );
+        assertEquals( 1, candidateResults.size() );
+    }
+
+    @Test
+    public void testDenseLocationIndex() {
+
+        Id appId = new SimpleId( "application" );
+        IndexScope indexScope = new IndexScopeImpl( appId, appId, "fastcars" );
+
+        EntityIndex entityIndex = cif.createEntityIndex( indexScope );
+
+        int numEntities = 500;
+
+        float minLattitude = 48.32455f;
+        float maxLattitude = 48.46481f;
+        float minLongitude = 9.89561f;
+        float maxLongitude = 10.0471f;
+
+        float lattitudeDelta = ( maxLattitude - minLattitude ) / numEntities;
+
+        float longitudeDelta = ( maxLongitude - minLongitude ) / numEntities;
+
+        for ( int i = 0; i < numEntities; i++ ) {
+            float lattitude = minLattitude + lattitudeDelta * i;
+            float longitude = minLongitude + longitudeDelta * i;
+
+            Map<String, Float> location = MapUtils.hashMap( "latitude", lattitude ).map( "longitude", longitude );
+
+            Map<String, Object> data = new HashMap<String, Object>( 2 );
+            data.put( "name", String.valueOf( i ) );
+            data.put( "location", location );
+
+            Entity entity = EntityIndexMapUtils.fromMap( data );
+            EntityUtils.setId( entity, new SimpleId( "fastcar"+i ) );
+            EntityUtils.setVersion( entity, UUIDGenerator.newTimeUUID() );
+            entityIndex.index( entity );
+
+        }
+
+
+        float latitude = 48.38626f;
+        float longtitude = 9.94175f;
+        int distance = 1000;
+
+        final Map<String, Float> location = MapUtils.hashMap( "latitude", latitude ).map( "longitude", longtitude );
+
+
+
+        Map entityMap = new HashMap() {{
+            put( "name", "Ferrari 212 Inter" );
+            put( "introduced", 1952 );
+            put( "topspeed", 215 );
+            put( "location", location);
+        }};
+
+
+        Entity entity = EntityIndexMapUtils.fromMap( entityMap );
+        EntityUtils.setId( entity, new SimpleId( "fastcar" ) );
+        EntityUtils.setVersion( entity, UUIDGenerator.newTimeUUID() );
+        entityIndex.index( entity );
+
+        entityIndex.refresh();
+
+        CandidateResults candidateResults;
+
+        Query query = Query.fromQL( "select * where location within "
+                + distance + " of " + latitude + ", " + longtitude );
+
+        candidateResults = entityIndex.search( query );
+        assertEquals( 1, candidateResults.size() );
     }
 
 

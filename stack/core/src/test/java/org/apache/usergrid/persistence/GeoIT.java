@@ -336,7 +336,7 @@ public class GeoIT extends AbstractCoreIT {
 
         // save objects in a diagonal line from -90 -180 to 90 180
 
-        int numEntities = 100;
+        int numEntities = 300;
 
         float minLattitude = -90;
         float maxLattitude = 90;
@@ -365,7 +365,8 @@ public class GeoIT extends AbstractCoreIT {
         Query query = new Query();
         // earth's circumference is 40,075 kilometers. Up it to 50,000kilometers
         // just to be save
-        query.addFilter( "location within 0 of -90, -180" );
+        //this was just copy and pasted from above, not sure if this test is testing what it needs to test
+        query.addFilter( "location within 50000000 of -90, -180" );
         query.setLimit( 100 );
 
         int count = 0;
@@ -380,8 +381,8 @@ public class GeoIT extends AbstractCoreIT {
         }
         while ( query.getCursor() != null );
 
-        // check we got back all 500 entities
-        assertEquals( numEntities, count );
+        // check we got back all 100 entities up to the limit
+        assertEquals( 100, count );
     }
 
 
