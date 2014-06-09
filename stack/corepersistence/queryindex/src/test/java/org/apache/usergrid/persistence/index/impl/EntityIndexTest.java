@@ -314,6 +314,10 @@ public class EntityIndexTest extends BaseIT {
         testQuery( entityIndex, "name = 'Minerva Harrell' and age >= 40", 1 );
 
         testQuery( entityIndex, "name = 'Minerva Harrell' and age <= 40", 1 );
+        
+        testQuery( entityIndex, "name = 'Morgan* '", 1 );
+        
+        testQuery( entityIndex, "name = 'Morgan*'", 1 );
     }
 
 
