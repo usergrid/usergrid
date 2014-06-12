@@ -17,6 +17,8 @@
 package org.apache.usergrid.security.tokens;
 
 
+import org.apache.usergrid.utils.StringUtils;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -72,11 +74,11 @@ public enum TokenCategory {
 
 
     public static TokenCategory getFromBase64String( String token ) {
-        if ( token == null ) {
+        if ( StringUtils.isBlank(token) ) {
             return null;
         }
-        if ( token.length() >= 4 ) {
-            return base64Prefixes.get( token.substring( 0, 4 ) );
+        if ( token.length() >= BASE64_PREFIX_LENGTH ) {
+            return base64Prefixes.get( token.substring( 0, BASE64_PREFIX_LENGTH ) );
         }
         return null;
     }

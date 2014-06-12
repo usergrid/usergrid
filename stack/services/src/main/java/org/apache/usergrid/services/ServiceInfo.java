@@ -17,6 +17,7 @@
 package org.apache.usergrid.services;
 
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -52,6 +53,7 @@ public class ServiceInfo {
     private final String itemType;
     private final List<String> patterns;
     private final List<String> collections;
+    private static final Charset DEFAULT_CHARSET = Charset.forName("UTF-8");
 
     /** Pre calced since we cache this class */
     private int hashCode;
@@ -71,7 +73,7 @@ public class ServiceInfo {
         Hasher hasher = Hashing.md5().newHasher();
 
         for ( String pattern : patterns ) {
-            hasher.putString( pattern );
+            hasher.putString( pattern, DEFAULT_CHARSET );
         }
 
         hashCode = hasher.hash().asInt();

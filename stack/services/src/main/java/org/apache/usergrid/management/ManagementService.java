@@ -302,6 +302,7 @@ public interface ManagementService {
     public boolean newAppUsersNeedAdminApproval( UUID applicationId ) throws Exception;
 
     public boolean newAppUsersRequireConfirmation( UUID applicationId ) throws Exception;
+    public boolean appAllowOpenRegistration( UUID applicationId ) throws Exception;
 
     public abstract void provisionSuperuser() throws Exception;
 

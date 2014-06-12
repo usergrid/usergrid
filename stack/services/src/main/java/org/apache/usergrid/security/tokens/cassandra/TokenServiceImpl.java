@@ -20,6 +20,7 @@ package org.apache.usergrid.security.tokens.cassandra;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+import org.apache.usergrid.utils.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -356,6 +357,9 @@ public class TokenServiceImpl implements TokenService {
             logger.error( "Unable to find token with the specified value ignoring request.  Value : {}", token );
             return;
         }
+        if(info == null){
+            return;
+        }
 
         UUID tokenId = info.getUuid();
 
@@ -497,15 +501,30 @@ public class TokenServiceImpl implements TokenService {
         return buff;
     }
 
+    private void assertToken(TokenCategory tokenCategory, byte[] tokenBytes) throws BadTokenException{
+        int expectedLength = tokenCategory.getExpires() ? 44 : 36;
+        if(expectedLength != tokenBytes.length){
+            throw new BadTokenException( "Invalid token signature" );
+        }
+    }
 
     private UUID getUUIDForToken( String token ) throws ExpiredTokenException, BadTokenException {
+        if(StringUtils.isBlank(token)){
+            return null;
+        }
         TokenCategory tokenCategory = TokenCategory.getFromBase64String( token );
+        if(tokenCategory == null){
+            return null;
+        }
         byte[] bytes = decodeBase64( token.substring( TokenCategory.BASE64_PREFIX_LENGTH ) );
+
+        assertToken(tokenCategory, bytes);
+
         UUID uuid = uuid( bytes );
         int i = 16;
         long expires = Long.MAX_VALUE;
-        if ( tokenCategory.getExpires() ) {
-            expires = ByteBuffer.wrap( bytes, i, 8 ).getLong();
+        if (tokenCategory.getExpires()) {
+            expires = ByteBuffer.wrap(bytes, i, 8).getLong();
             i = 24;
         }
         ByteBuffer expected = ByteBuffer.allocate( 20 );
