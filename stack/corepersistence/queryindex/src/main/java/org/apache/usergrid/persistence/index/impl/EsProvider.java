@@ -18,19 +18,24 @@
  */
 package org.apache.usergrid.persistence.index.impl;
 
-import com.google.inject.Inject;
-import com.google.inject.Singleton;
-import org.apache.usergrid.persistence.core.util.AvailablePortFinder;
-import org.apache.usergrid.persistence.index.IndexFig;
 import org.elasticsearch.client.Client;
-import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.node.NodeBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.apache.usergrid.persistence.core.util.AvailablePortFinder;
+import org.apache.usergrid.persistence.index.IndexFig;
+
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import java.io.File;
+import java.io.IOException;
+import java.util.Properties;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.RandomStringUtils;
 
 /**
  * Provides access to ElasticSearch client.
@@ -63,47 +68,81 @@ public class EsProvider {
 
             if (fig.isEmbedded()) {
 
-                int port = AvailablePortFinder.getNextAvailable( 2000 );
+                int port = AvailablePortFinder.getNextAvailable(2000);
+
+                File tempDir;
+                try {
+                    tempDir = getTempDirectory();
+                } catch (IOException ex) {
+                    throw new RuntimeException("Fatal error unable to create temp dir");
+                }
 
                 Settings settings = ImmutableSettings.settingsBuilder()
-                        .put("node.http.enabled", true)
-                        .put("transport.tcp.port", port)
-                        .put("path.logs", "target/elasticsearch/logs_" + port)
-                        .put("path.data", "target/elasticsearch/data_" + port)
-                        .put("gateway.type", "none")
-                        .put("index.store.type", "memory")
-                        .put("index.number_of_shards", 1)
-                        .put("index.number_of_replicas", 1)
-                        .build();
+                    .put("node.http.enabled", true)
+                    .put("transport.tcp.port", port)
+                    .put("path.logs", "target/elasticsearch/logs_" + tempDir.toString())
+                    .put("path.data", "target/elasticsearch/data_" + tempDir.toString())
+                    .put("gateway.type", "none").put("index.store.type", "memory")
+                    .put("index.number_of_shards", 1)
+                    .put("index.number_of_replicas", 1).build();
 
-                log.info("Starting ElasticSearch embedded with settings: " +  settings.getAsMap());
+                log.info("Starting ElasticSearch embedded with settings: " + settings.getAsMap());
 
                 Node node = NodeBuilder.nodeBuilder().local(true).settings(settings).node();
                 newClient = node.client();
 
             } else { // build client that connects to all hosts
 
+                final String hosts = fig.getHosts();
+
                 Settings settings = ImmutableSettings.settingsBuilder()
-                        .put("cluster.name", fig.getClusterName() )
-                        // TODO: consider making these configurable
-                        .put("client.transport.ignore_cluster_name", true )
-                        .put("client.transport.ping_timeout", 2000) // milliseconds
-                        .put("client.transport.nodes_sampler_interval", 100 )
-                        .build();
+                    .put("client.transport.ping_timeout", 2000) // milliseconds
+                    .put("client.transport.nodes_sampler_interval", 100).put("http.enabled", false)
 
-                log.info("Creating ElasticSearch client with settings: " +  settings.getAsMap());
+                    // this assumes that we're using zen for host discovery.  Putting an 
+                    // explicit set of bootstrap hosts ensures we connect to a valid cluster.
+                    .put("discovery.zen.ping.unicast.hosts", hosts).build();
 
-                TransportClient transportClient = new TransportClient(settings);
+                Node node = NodeBuilder.nodeBuilder().settings(settings)
+                    .clusterName(fig.getClusterName())
+                    .client(true).node();
 
-                for (String host : fig.getHosts().split(",")) {
-                    transportClient.addTransportAddress(
-                            new InetSocketTransportAddress(host.trim(), fig.getPort()));
-                    log.info("   Added transport for ElasticSearch host {}:{}", host.trim(), fig.getPort() ) ;
-                }
-                newClient = transportClient;
+                newClient = node.client();
+
             }
             client = newClient;
         }
         return client;
+    }
+
+
+    /**
+     * Uses a project.properties file that Maven does substitution on to to replace the value of a 
+     * property with the path to the Maven build directory (a.k.a. target). It then uses this path 
+     * to generate a random String which it uses to append a path component to so a unique directory 
+     * is selected. If already present it's deleted, then the directory is created.
+     *
+     * @return a unique temporary directory
+     *
+     * @throws IOException if we cannot access the properties file
+     */
+    public static File getTempDirectory() throws IOException {
+        File tmpdir;
+        Properties props = new Properties();
+        props.load( ClassLoader.getSystemResourceAsStream( "project.properties" ) );
+        File basedir = new File( ( String ) props.get( "target.directory" ) );
+        String comp = RandomStringUtils.randomAlphanumeric( 7 );
+        tmpdir = new File( basedir, comp );
+
+        if ( tmpdir.exists() ) {
+            log.info( "Deleting directory: {}", tmpdir );
+            FileUtils.forceDelete( tmpdir );
+        }
+        else {
+            log.info( "Creating temporary directory: {}", tmpdir );
+            FileUtils.forceMkdir( tmpdir );
+        }
+
+        return tmpdir;
     }
 }

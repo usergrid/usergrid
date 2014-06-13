@@ -575,6 +575,9 @@ public interface EntityManager {
     public boolean isPropertyValueUniqueForEntity( 
             String entityType, String propertyName, Object propertyValue ) throws Exception;
 
+    @Deprecated
+    public Entity get( UUID id ) throws Exception;
+
     public <A extends Entity> A get( EntityRef entityRef, Class<A> entityClass ) throws Exception;
 
     public Map<String, Role> getRolesWithTitles( Set<String> roleNames ) throws Exception;
@@ -604,10 +607,6 @@ public interface EntityManager {
     <A extends Entity> A batchCreate(Mutator<ByteBuffer> m, String entityType, 
             Class<A> entityClass, Map<String, Object> properties, 
             UUID importId, UUID timestampUuid) throws Exception;
-
-    void batchCreateRole(Mutator<ByteBuffer> batch, UUID groupId, String roleName, 
-            String roleTitle, long inactivity, RoleRef roleRef, UUID timestampUuid) throws Exception;
-
     /**
      * Batch dictionary property.
      *
@@ -681,6 +680,7 @@ public interface EntityManager {
 
     // things added for Core Persistence
 
+    // testing only
     void refreshIndex();
 
     public void init( EntityManagerFactory emf, UUID applicationId);

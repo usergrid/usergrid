@@ -17,7 +17,6 @@
 package org.apache.usergrid.persistence;
 
 
-import org.apache.usergrid.persistence.index.query.Query;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -36,6 +35,7 @@ import org.apache.usergrid.CoreApplication;
 import org.apache.usergrid.persistence.entities.User;
 import org.apache.usergrid.persistence.exceptions.DuplicateUniquePropertyExistsException;
 import org.apache.usergrid.persistence.index.query.Identifier;
+import org.apache.usergrid.persistence.index.query.Query;
 import org.apache.usergrid.persistence.index.query.Query.Level;
 import org.apache.usergrid.utils.JsonUtils;
 import org.apache.usergrid.utils.UUIDUtils;
@@ -382,12 +382,12 @@ public class CollectionIT extends AbstractCoreIT {
 
         properties = new LinkedHashMap<String, Object>();
         properties.put( "nickname", "ed" );
-        em.updateProperties( new SimpleCollectionRef( group, "users", user1 ), properties );
+        em.updateProperties( user1, properties );
 
         em.refreshIndex();
 
         Results r = em.searchCollection( group, "users", 
-            new Query().addEqualityFilter( "member.nickname", "ed" )
+            new Query().addEqualityFilter( "nickname", "ed" )
                 .withResultsLevel(Level.LINKED_PROPERTIES ) );
 
         LOG.info( JsonUtils.mapToFormattedJsonString( r.getEntities() ) );
@@ -1518,15 +1518,19 @@ public class CollectionIT extends AbstractCoreIT {
         em.refreshIndex();
 
         // String s = "select * where Flag = 'requested'";
-        // String s =
-        // "select * where Flag = 'requested' and NOT Recipient.Username = 'fb_536692245' order by created asc";
-        String s = "select * where Flag = 'requested' and NOT Recipient.Username = 'fb_536692245' order by created asc";
+        // String s = "select * where Flag = 'requested' and NOT Recipient.Username = 
+        // 'fb_536692245' order by created asc";
+
+        String s = "select * where Flag = 'requested' and NOT Recipient.Username "
+                + "= 'fb_536692245' order by created asc";
         Query query = Query.fromQL( s );
 
         Results r = em.searchCollection( em.getApplicationRef(), "loveobjects", query );
         assertTrue( r.size() == 1 );
 
-        String username = ( String ) ( ( Map ) r.getEntities().get( 0 ).getProperty( "Recipient" ) ).get( "Username" );
+        String username = (String)( (Map)r.getEntities().get( 0 )
+                .getProperty( "Recipient" ) ).get( "Username" );
+
         // selection results should be a list of lists
 //        List<Object> sr = query.getSelectionResults( r );
 //        assertTrue( sr.size() == 1 );
@@ -1791,7 +1795,6 @@ public class CollectionIT extends AbstractCoreIT {
 
         Entity createdRestaurant = em.create( "restaurant", restaurant.getProperties() );
         assertNotNull( createdRestaurant );
-
 
         //we create 2 entities, otherwise this test will pass when it shouldn't
         DynamicEntity restaurant2 = new DynamicEntity();

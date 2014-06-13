@@ -32,7 +32,8 @@ import org.apache.usergrid.persistence.core.consistency.AsyncProcessor;
 import org.apache.usergrid.persistence.core.consistency.AsyncProcessorFactory;
 import org.apache.usergrid.persistence.core.consistency.AsynchronousMessage;
 import org.apache.usergrid.persistence.core.consistency.ConsistencyFig;
-import org.apache.usergrid.persistence.core.hystrix.HystrixGraphObservable;
+import org.apache.usergrid.persistence.core.consistency.TimeService;
+import org.apache.usergrid.persistence.core.hystrix.HystrixObservable;
 import org.apache.usergrid.persistence.core.rx.ObservableIterator;
 import org.apache.usergrid.persistence.core.scope.ApplicationScope;
 import org.apache.usergrid.persistence.core.util.ValidationUtils;
@@ -90,15 +91,15 @@ public class GraphManagerImpl implements GraphManager {
     private final GraphFig graphFig;
     private final ConsistencyFig consistencyFig;
 
-
     @Inject
     public GraphManagerImpl( final EdgeMetadataSerialization edgeMetadataSerialization,
                              @CommitLogEdgeSerialization final EdgeSerialization commitLogSerialization,
                              final NodeSerialization nodeSerialization, final GraphFig graphFig,
-                             final AsyncProcessorFactory asyncProcessorFactory,
-                             final MergedEdgeReader mergedEdgeReader,
+                             final AsyncProcessorFactory asyncProcessorFactory, final MergedEdgeReader mergedEdgeReader,
                              final ConsistencyFig consistencyFig,
-                             @Assisted final ApplicationScope scope) {
+                             @Assisted final ApplicationScope scope
+                             ) {
+
 
 
         ValidationUtils.validateApplicationScope( scope );
@@ -119,6 +120,7 @@ public class GraphManagerImpl implements GraphManager {
         this.graphFig = graphFig;
         this.consistencyFig = consistencyFig;
 
+
         this.edgeDeleteAsyncProcessor = asyncProcessorFactory.getProcessor( EdgeDeleteEvent.class );
 
         this.nodeDeleteAsyncProcessor = asyncProcessorFactory.getProcessor( NodeDeleteEvent.class );
@@ -133,13 +135,12 @@ public class GraphManagerImpl implements GraphManager {
 
         final MarkedEdge markedEdge = new SimpleMarkedEdge( edge, false );
 
-        return HystrixGraphObservable
+        return HystrixObservable
                 .user( Observable.from( markedEdge ).subscribeOn( Schedulers.io() ).map( new Func1<MarkedEdge, Edge>() {
                     @Override
                     public Edge call( final MarkedEdge edge ) {
 
                         final UUID timestamp = UUIDGenerator.newTimeUUID();
-
 
 
                         final MutationBatch mutation = edgeMetadataSerialization.writeEdge( scope, edge );
@@ -149,9 +150,7 @@ public class GraphManagerImpl implements GraphManager {
                         mutation.mergeShallow( edgeMutation );
 
                         final AsynchronousMessage<EdgeWriteEvent> event = edgeWriteAsyncProcessor
-                                                       .setVerification( new EdgeWriteEvent( scope, timestamp, edge ),
-                                                               getTimeout() );
-
+                                .setVerification( new EdgeWriteEvent( scope, timestamp, edge ), getTimeout() );
 
 
                         try {
@@ -179,9 +178,8 @@ public class GraphManagerImpl implements GraphManager {
 
 
         return
-                HystrixGraphObservable
-                .user(
-                        Observable.from( markedEdge ).subscribeOn( Schedulers.io() ).map( new Func1<MarkedEdge, Edge>() {
+                HystrixObservable
+                .user( Observable.from( markedEdge ).subscribeOn( Schedulers.io() ).map( new Func1<MarkedEdge, Edge>() {
                     @Override
                     public Edge call( final MarkedEdge edge ) {
 
@@ -190,9 +188,8 @@ public class GraphManagerImpl implements GraphManager {
 
                         final MutationBatch edgeMutation = commitLogSerialization.writeEdge( scope, edge, timestamp );
 
-                        final AsynchronousMessage<EdgeDeleteEvent> event =
-                                edgeDeleteAsyncProcessor.setVerification( new EdgeDeleteEvent( scope, timestamp, edge ),
-                                        getTimeout() );
+                        final AsynchronousMessage<EdgeDeleteEvent> event = edgeDeleteAsyncProcessor
+                                .setVerification( new EdgeDeleteEvent( scope, timestamp, edge ), getTimeout() );
 
 
                         try {
@@ -213,20 +210,19 @@ public class GraphManagerImpl implements GraphManager {
 
 
     @Override
-    public Observable<Id> deleteNode( final Id node ) {
-        return HystrixGraphObservable
+    public Observable<Id> deleteNode( final Id node, final long timestamp ) {
+        return HystrixObservable
                 .user( Observable.from( node ).subscribeOn( Schedulers.io() ).map( new Func1<Id, Id>() {
                     @Override
                     public Id call( final Id id ) {
 
                         //mark the node as deleted
-                        final UUID deleteTime = UUIDGenerator.newTimeUUID();
 
-                        final MutationBatch nodeMutation = nodeSerialization.mark( scope, id, deleteTime );
 
-                        final AsynchronousMessage<NodeDeleteEvent> event =
-                                nodeDeleteAsyncProcessor.setVerification(
-                                        new NodeDeleteEvent( scope, deleteTime, node ), getTimeout() );
+                        final MutationBatch nodeMutation = nodeSerialization.mark( scope, id, timestamp );
+
+                        final AsynchronousMessage<NodeDeleteEvent> event = nodeDeleteAsyncProcessor
+                                .setVerification( new NodeDeleteEvent( scope, UUIDGenerator.newTimeUUID(), timestamp, node ), getTimeout() );
 
 
                         try {
@@ -247,52 +243,52 @@ public class GraphManagerImpl implements GraphManager {
 
     @Override
     public Observable<Edge> loadEdgeVersions( final SearchByEdge searchByEdge ) {
-        return HystrixGraphObservable
+        return HystrixObservable
                 .user( mergedEdgeReader.getEdgeVersions( scope, searchByEdge ).buffer( graphFig.getScanPageSize() )
-                                       .flatMap( new EdgeBufferFilter( searchByEdge.getMaxVersion() ) )
+                                       .flatMap( new EdgeBufferFilter( searchByEdge.getMaxTimestamp() ) )
                                        .cast( Edge.class ) );
     }
 
 
     @Override
     public Observable<Edge> loadEdgesFromSource( final SearchByEdgeType search ) {
-        return HystrixGraphObservable
+        return HystrixObservable
                 .user( mergedEdgeReader.getEdgesFromSource( scope, search ).buffer( graphFig.getScanPageSize() )
-                                       .flatMap( new EdgeBufferFilter( search.getMaxVersion() ) ).cast( Edge.class ) );
+                                       .flatMap( new EdgeBufferFilter( search.getMaxTimestamp() ) ).cast( Edge.class ) );
     }
 
 
     @Override
     public Observable<Edge> loadEdgesToTarget( final SearchByEdgeType search ) {
-        return HystrixGraphObservable
+        return HystrixObservable
                 .user( mergedEdgeReader.getEdgesToTarget( scope, search ).buffer( graphFig.getScanPageSize() )
-                                       .flatMap( new EdgeBufferFilter( search.getMaxVersion() ) ).cast( Edge.class ) );
+                                       .flatMap( new EdgeBufferFilter( search.getMaxTimestamp() ) ).cast( Edge.class ) );
     }
 
 
     @Override
     public Observable<Edge> loadEdgesFromSourceByType( final SearchByIdType search ) {
-        return HystrixGraphObservable.user( mergedEdgeReader.getEdgesFromSourceByTargetType( scope, search )
-                                                            .buffer( graphFig.getScanPageSize() )
-                                                            .flatMap( new EdgeBufferFilter( search.getMaxVersion() ) )
+        return HystrixObservable.user( mergedEdgeReader.getEdgesFromSourceByTargetType( scope, search )
+                                                       .buffer( graphFig.getScanPageSize() )
+                                                       .flatMap( new EdgeBufferFilter( search.getMaxTimestamp() ) )
 
-                                                            .cast( Edge.class ) );
+                                                       .cast( Edge.class ) );
     }
 
 
     @Override
     public Observable<Edge> loadEdgesToTargetByType( final SearchByIdType search ) {
-        return HystrixGraphObservable.user( mergedEdgeReader.getEdgesToTargetBySourceType( scope, search )
-                                                            .buffer( graphFig.getScanPageSize() )
-                                                            .flatMap( new EdgeBufferFilter( search.getMaxVersion() ) )
-                                                            .cast( Edge.class ) );
+        return HystrixObservable.user( mergedEdgeReader.getEdgesToTargetBySourceType( scope, search )
+                                                       .buffer( graphFig.getScanPageSize() )
+                                                       .flatMap( new EdgeBufferFilter( search.getMaxTimestamp() ) )
+                                                       .cast( Edge.class ) );
     }
 
 
     @Override
     public Observable<String> getEdgeTypesFromSource( final SearchEdgeType search ) {
 
-        return HystrixGraphObservable
+        return HystrixObservable
                 .user( Observable.create( new ObservableIterator<String>( "getEdgeTypesFromSource" ) {
                     @Override
                     protected Iterator<String> getIterator() {
@@ -304,7 +300,7 @@ public class GraphManagerImpl implements GraphManager {
 
     @Override
     public Observable<String> getIdTypesFromSource( final SearchIdType search ) {
-        return HystrixGraphObservable
+        return HystrixObservable
                 .user( Observable.create( new ObservableIterator<String>( "getIdTypesFromSource" ) {
                     @Override
                     protected Iterator<String> getIterator() {
@@ -317,7 +313,7 @@ public class GraphManagerImpl implements GraphManager {
     @Override
     public Observable<String> getEdgeTypesToTarget( final SearchEdgeType search ) {
 
-        return HystrixGraphObservable
+        return HystrixObservable
                 .user( Observable.create( new ObservableIterator<String>( "getEdgeTypesToTarget" ) {
                     @Override
                     protected Iterator<String> getIterator() {
@@ -329,7 +325,7 @@ public class GraphManagerImpl implements GraphManager {
 
     @Override
     public Observable<String> getIdTypesToTarget( final SearchIdType search ) {
-        return HystrixGraphObservable.user( Observable.create( new ObservableIterator<String>( "getIdTypesToTarget" ) {
+        return HystrixObservable.user( Observable.create( new ObservableIterator<String>( "getIdTypesToTarget" ) {
             @Override
             protected Iterator<String> getIterator() {
                 return edgeMetadataSerialization.getIdTypesToTarget( scope, search );
@@ -351,10 +347,10 @@ public class GraphManagerImpl implements GraphManager {
      */
     private class EdgeBufferFilter implements Func1<List<MarkedEdge>, Observable<MarkedEdge>> {
 
-        private final UUID maxVersion;
+        private final long maxVersion;
 
 
-        private EdgeBufferFilter( final UUID maxVersion ) {
+        private EdgeBufferFilter( final long maxVersion ) {
             this.maxVersion = maxVersion;
         }
 
@@ -369,7 +365,7 @@ public class GraphManagerImpl implements GraphManager {
         @Override
         public Observable<MarkedEdge> call( final List<MarkedEdge> markedEdges ) {
 
-            final Map<Id, UUID> markedVersions = nodeSerialization.getMaxVersions( scope, markedEdges );
+            final Map<Id, Long> markedVersions = nodeSerialization.getMaxVersions( scope, markedEdges );
             return Observable.from( markedEdges ).filter( new EdgeFilter( this.maxVersion, markedVersions ) );
         }
     }
@@ -380,13 +376,13 @@ public class GraphManagerImpl implements GraphManager {
      */
     private static class EdgeFilter implements Func1<MarkedEdge, Boolean> {
 
-        private final UUID maxVersion;
+        private final long maxTimestamp;
 
-        private final Map<Id, UUID> markCache;
+        private final Map<Id, Long> markCache;
 
 
-        private EdgeFilter( final UUID maxVersion, Map<Id, UUID> markCache ) {
-            this.maxVersion = maxVersion;
+        private EdgeFilter( final long maxTimestamp, Map<Id, Long> markCache ) {
+            this.maxTimestamp = maxTimestamp;
             this.markCache = markCache;
         }
 
@@ -395,27 +391,27 @@ public class GraphManagerImpl implements GraphManager {
         public Boolean call( final MarkedEdge edge ) {
 
 
-            final UUID edgeVersion = edge.getVersion();
+            final long edgeTimestamp = edge.getTimestamp();
 
             //our edge needs to not be deleted and have a version that's > max Version
-            if ( edge.isDeleted() || UUIDComparator.staticCompare( edgeVersion, maxVersion ) > 0 ) {
+            if ( edge.isDeleted() || Long.compare( edgeTimestamp, maxTimestamp )> 0 ) {
                 return false;
             }
 
 
-            final UUID sourceVersion = markCache.get( edge.getSourceNode() );
+            final Long sourceTimestamp = markCache.get( edge.getSourceNode() );
 
             //the source Id has been marked for deletion.  It's version is <= to the marked version for deletion,
             // so we need to discard it
-            if ( sourceVersion != null && UUIDComparator.staticCompare( edgeVersion, sourceVersion ) < 1 ) {
+            if ( sourceTimestamp != null && Long.compare( edgeTimestamp, sourceTimestamp ) < 1 ) {
                 return false;
             }
 
-            final UUID targetVersion = markCache.get( edge.getTargetNode() );
+            final Long targetTimestamp = markCache.get( edge.getTargetNode() );
 
             //the target Id has been marked for deletion.  It's version is <= to the marked version for deletion,
             // so we need to discard it
-            if ( targetVersion != null && UUIDComparator.staticCompare( edgeVersion, targetVersion ) < 1 ) {
+            if ( targetTimestamp != null &&  Long.compare( edgeTimestamp, targetTimestamp ) < 1 ) {
                 return false;
             }
 

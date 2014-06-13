@@ -59,6 +59,8 @@ public class OrganizationIT {
         OrganizationInfo organization = setup.getMgmtSvc().createOrganization( "OrganizationIT", user, false );
         assertNotNull( organization );
 
+        setup.getEmf().getEntityManager( setup.getSmf().getManagementAppId() ).refreshIndex();
+
         Map<UUID, String> userOrganizations = setup.getMgmtSvc().getOrganizationsForAdminUser( user.getUuid() );
         assertEquals( "wrong number of organizations", 1, userOrganizations.size() );
 
@@ -67,6 +69,8 @@ public class OrganizationIT {
 
         UUID applicationId = setup.getMgmtSvc().createApplication( organization.getUuid(), "ed-application" ).getId();
         assertNotNull( applicationId );
+
+        setup.getEmf().getEntityManager( setup.getSmf().getManagementAppId() ).refreshIndex();
 
         Map<UUID, String> applications = setup.getMgmtSvc().getApplicationsForOrganization( organization.getUuid() );
         assertEquals( "wrong number of applications", 1, applications.size() );
@@ -112,6 +116,8 @@ public class OrganizationIT {
         OrganizationInfo organization = setup.getMgmtSvc().createOrganization( "OrganizationTest2", user, true );
         assertNotNull( organization );
 
+        setup.getEmf().getEntityManager( setup.getSmf().getManagementAppId() );
+
         // no history, no problem
         setup.getMgmtSvc().setAdminUserPassword( user.getUuid(), passwords[1] );
         setup.getMgmtSvc().setAdminUserPassword( user.getUuid(), passwords[0] );
@@ -129,6 +135,9 @@ public class OrganizationIT {
         setup.getMgmtSvc().setAdminUserPassword( user.getUuid(), passwords[3] ); // ok
         setup.getMgmtSvc().setAdminUserPassword( user.getUuid(), passwords[4] ); // ok
         setup.getMgmtSvc().setAdminUserPassword( user.getUuid(), passwords[0] ); // ok
+
+        setup.getEmf().getEntityManager( setup.getSmf().getManagementAppId() );
+
         try {
             setup.getMgmtSvc().setAdminUserPassword( user.getUuid(), passwords[2] );
             fail( "password change should fail" );

@@ -15,16 +15,13 @@
  * copyright in this work, please see the NOTICE file in the top level
  * directory of this distribution.
  */
-package org.apache.usergrid.persistence.index.impl;
-
+package org.apache.usergrid.corepersistence;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.UUID;
 
 import org.apache.usergrid.persistence.collection.CollectionScope;
-import org.apache.usergrid.persistence.collection.mvcc.entity.MvccEntity;
 import org.apache.usergrid.persistence.collection.mvcc.entity.impl.MvccEntityDeleteEvent;
 import org.apache.usergrid.persistence.collection.serialization.SerializationFig;
 import org.apache.usergrid.persistence.core.consistency.AsyncProcessorFactory;
@@ -34,12 +31,9 @@ import org.apache.usergrid.persistence.core.rx.ObservableIterator;
 import org.apache.usergrid.persistence.index.EntityIndex;
 import org.apache.usergrid.persistence.index.EntityIndexFactory;
 import org.apache.usergrid.persistence.index.IndexScope;
+import org.apache.usergrid.persistence.index.impl.IndexScopeImpl;
 import org.apache.usergrid.persistence.index.query.CandidateResult;
 import org.apache.usergrid.persistence.index.query.CandidateResults;
-import org.apache.usergrid.persistence.model.entity.Entity;
-import org.apache.usergrid.persistence.model.entity.Id;
-
-import com.google.common.base.Optional;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 
@@ -47,25 +41,28 @@ import rx.Observable;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
+/**
+ * Listener for cleans up old indexes and deletes from indexer
+ */
 @Singleton
-public class EsEntityIndexDeleteListener implements MessageListener<MvccEntityDeleteEvent, EntityVersion> {
+public class CpEntityIndexDeleteListener implements MessageListener<MvccEntityDeleteEvent, EntityVersion> {
 
     private final SerializationFig serializationFig;
     private final EntityIndexFactory entityIndexFactory;
 
     @Inject
-    public EsEntityIndexDeleteListener(final EntityIndexFactory entityIndexFactory,
-                                      final AsyncProcessorFactory asyncProcessorFactory,
+    public CpEntityIndexDeleteListener(final EntityIndexFactory entityIndexFactory,
+                                       final AsyncProcessorFactory asyncProcessorFactory,
                                        SerializationFig serializationFig) {
         this.entityIndexFactory = entityIndexFactory;
         this.serializationFig = serializationFig;
-        asyncProcessorFactory.getProcessor( MvccEntityDeleteEvent.class ).addListener( this );
+        asyncProcessorFactory.getProcessor(MvccEntityDeleteEvent.class).addListener(this);
     }
 
     @Override
     public Observable<EntityVersion> receive(final MvccEntityDeleteEvent event) {
         CollectionScope collectionScope = event.getCollectionScope();
-        IndexScope indexScope = new IndexScopeImpl(collectionScope.getApplication(),collectionScope.getOwner(),collectionScope.getName());
+        IndexScope indexScope = new IndexScopeImpl(collectionScope.getApplication(), collectionScope.getOwner(), collectionScope.getName());
         final EntityIndex entityIndex = entityIndexFactory.createEntityIndex(indexScope);
         return Observable.create(new ObservableIterator<CandidateResult>("deleteEsIndexVersions") {
             @Override
@@ -75,15 +72,15 @@ public class EsEntityIndexDeleteListener implements MessageListener<MvccEntityDe
             }
         }).subscribeOn(Schedulers.io())
                 .buffer(serializationFig.getBufferSize())
-                .flatMap( new Func1<List<CandidateResult>, Observable<? extends EntityVersion>>() {
+                .flatMap(new Func1<List<CandidateResult>, Observable<? extends EntityVersion>>() {
                     @Override
                     public Observable<? extends EntityVersion> call(List<CandidateResult> candidateResults) {
                         List<EntityVersion> versions = new ArrayList<>();
                         for (CandidateResult entity : candidateResults) {
                             //filter find entities <= current version
-                            if(entity.getVersion().timestamp() <= event.getVersion().timestamp()) {
+                            if (entity.getVersion().timestamp() <= event.getVersion().timestamp()) {
                                 versions.add(entity);
-                                entityIndex.deindex(entity.getId(),entity.getVersion());
+                                entityIndex.deindex(entity.getId(), entity.getVersion());
                             }
                         }
                         return Observable.from(versions);

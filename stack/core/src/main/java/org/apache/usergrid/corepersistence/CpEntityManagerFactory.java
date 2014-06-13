@@ -36,10 +36,14 @@ import static org.apache.usergrid.persistence.Schema.PROPERTY_UUID;
 import static org.apache.usergrid.persistence.Schema.TYPE_APPLICATION;
 import org.apache.usergrid.persistence.cassandra.CassandraService;
 import org.apache.usergrid.persistence.cassandra.CounterUtils;
+import org.apache.usergrid.persistence.cassandra.Setup;
 import org.apache.usergrid.persistence.collection.CollectionScope;
 import org.apache.usergrid.persistence.collection.EntityCollectionManager;
 import org.apache.usergrid.persistence.collection.EntityCollectionManagerFactory;
 import org.apache.usergrid.persistence.collection.impl.CollectionScopeImpl;
+import org.apache.usergrid.persistence.core.scope.ApplicationScope;
+import org.apache.usergrid.persistence.core.scope.ApplicationScopeImpl;
+import org.apache.usergrid.persistence.entities.Application;
 import org.apache.usergrid.persistence.exceptions.ApplicationAlreadyExistsException;
 import org.apache.usergrid.persistence.graph.GraphManagerFactory;
 import org.apache.usergrid.persistence.index.EntityIndex;
@@ -76,10 +80,17 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
 
     private ApplicationContext applicationContext;
 
+    private Setup setup = null;
+
     public static final Class<DynamicEntity> APPLICATION_ENTITY_CLASS = DynamicEntity.class;
 
     // The System Application where we store app and org metadata
     public static final String SYSTEM_APPS_UUID = "b6768a08-b5d5-11e3-a495-10ddb1de66c3";
+    
+    public static final  UUID MANAGEMENT_APPLICATION_ID = UUID.fromString("b6768a08-b5d5-11e3-a495-11ddb1de66c8");
+
+    public static final  UUID DEFAULT_APPLICATION_ID = UUID.fromString("b6768a08-b5d5-11e3-a495-11ddb1de66c9");
+
 
     // Three types of things we store in System Application
     public static final String SYSTEM_APPS_TYPE = "zzzappszzz";
@@ -231,8 +242,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
         if ( orgUuid == null ) {
           
             // organization does not exist, create it.
-            Entity orgInfoEntity = new Entity(
-                new SimpleId(UUIDGenerator.newTimeUUID(), "organization" ));
+            Entity orgInfoEntity = new Entity(generateOrgId( UUIDGenerator.newTimeUUID() ));
 
             orgUuid = orgInfoEntity.getId().getUuid();
 
@@ -256,8 +266,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
         }
         properties.put( PROPERTY_NAME, appName );
 
-        Entity appInfoEntity = new Entity(
-            new SimpleId(UUIDGenerator.newTimeUUID(), "application" ));
+        Entity appInfoEntity = new Entity(generateApplicationId( UUIDGenerator.newTimeUUID() ));
 
         long timestamp = System.currentTimeMillis();
         appInfoEntity.setField( new LongField( PROPERTY_CREATED, (long)(timestamp / 1000)));
@@ -286,27 +295,13 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
     }
 
 
-    public CollectionScope getApplicationScope( UUID applicationId ) {
+    public ApplicationScope getApplicationScope( UUID applicationId ) {
 
-        Query q = Query.fromQL( PROPERTY_UUID + " = '" + applicationId.toString() + "'");
+        //We can always generate a scope, it doesn't matter if  the application exists yet or not.
 
-        EntityCollectionManager em= getManagerCache().getEntityCollectionManager(SYSTEM_APP_SCOPE);
-        EntityIndex ei = getManagerCache().getEntityIndex( SYSTEM_APPS_INDEX_SCOPE );
-        CandidateResults results = ei.search( q );
+        final ApplicationScopeImpl scope = new ApplicationScopeImpl( generateApplicationId( applicationId ) );
 
-        if ( results.isEmpty() ) {
-            return null;
-        }
-
-        CandidateResult candidateResult = results.iterator().next(); 
-
-        Entity appEntity = em.load( candidateResult.getId() ).toBlockingObservable().last();
-
-        return new CollectionScopeImpl(
-            new SimpleId( ((UUID)(appEntity.getField("organizationUuid")).getValue()), "organization"),
-            new SimpleId( appEntity.getId().getUuid(), "application"),
-            appEntity.getField(PROPERTY_NAME).getValue().toString()
-        );
+        return scope;
     }
     
 
@@ -380,7 +375,7 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
     
     @Override
     public void setup() throws Exception {
-        // no op?
+        getSetup().init();
     }
 
     
@@ -490,6 +485,11 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
     @Override
     public void setApplicationContext( ApplicationContext applicationContext ) throws BeansException {
         this.applicationContext = applicationContext;
+        try {
+            setup();
+        } catch (Exception ex) {
+            logger.error("Error setting up EMF", ex);
+        }
     }
 
     /**
@@ -499,8 +499,6 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
         this.managerCache = managerCache;
     }
 
-    static UUID MANAGEMENT_APPLICATION_ID = UUID.fromString("b6768a08-b5d5-11e3-a495-11ddb1de66c8");
-    static UUID DEFAULT_APPLICATION_ID = UUID.fromString("b6768a08-b5d5-11e3-a495-11ddb1de66c9");
 
     @Override
     public UUID getManagementAppId() {
@@ -512,17 +510,29 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
         return DEFAULT_APPLICATION_ID; 
     }
 
-    
-    /**
-     * Gets the setup.
-     *
-     * @return Setup helper
-     */
-    public CpSetup getSetup() {
-        return new CpSetup( this, cass );
+    private Id generateOrgId(UUID id){
+        return new SimpleId( id, "organization" );
     }
 
-    void refreshIndex() {
+
+    private Id generateApplicationId(UUID id){
+        return new SimpleId( id, Application.ENTITY_TYPE );
+    }
+   
+
+    /**
+     * Gets the setup.
+     * @return Setup helper
+     */
+    public Setup getSetup() {
+        if ( setup == null ) {
+            setup = new CpSetup( this, cass );
+        }
+        return setup;
+    }
+
+
+    public void refreshIndex() {
         managerCache.getEntityIndex( CpEntityManagerFactory.SYSTEM_APPS_INDEX_SCOPE ).refresh();
     }
 
