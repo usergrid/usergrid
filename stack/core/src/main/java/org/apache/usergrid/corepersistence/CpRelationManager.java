@@ -1529,7 +1529,7 @@ public class CpRelationManager implements RelationManager {
                 org.apache.usergrid.persistence.model.entity.Entity e =
                     ecm.load( cr.getId() ).toBlockingObservable().last();
 
-                if ( cr.getVersion().compareTo( e.getVersion()) < 0 )  {
+                if ( cr.getVersion().compareTo( e.getVersion()) > 0 )  {
                     logger.debug("Stale version uuid:{} type:{} version:{}", 
                         new Object[] {cr.getId().getUuid(), cr.getId().getType(), cr.getVersion()});
                     continue;
