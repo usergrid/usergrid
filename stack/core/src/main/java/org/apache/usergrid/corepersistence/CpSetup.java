@@ -17,20 +17,31 @@
 package org.apache.usergrid.corepersistence;
 
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.netflix.config.ConfigurationManager;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
-import me.prettyprint.cassandra.service.CassandraHost;
-import me.prettyprint.hector.api.ddl.ComparatorType;
-import static me.prettyprint.hector.api.factory.HFactory.createColumnFamilyDefinition;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.usergrid.mq.cassandra.QueuesCF;
 import org.apache.usergrid.persistence.EntityManagerFactory;
 import org.apache.usergrid.persistence.cassandra.ApplicationCF;
-import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.getCfDefs;
 import org.apache.usergrid.persistence.cassandra.CassandraService;
+import org.apache.usergrid.persistence.cassandra.Setup;
+import org.apache.usergrid.persistence.core.migration.MigrationException;
+import org.apache.usergrid.persistence.core.migration.MigrationManager;
+import org.apache.usergrid.persistence.entities.Application;
+
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.netflix.config.ConfigurationManager;
+
+import me.prettyprint.cassandra.service.CassandraHost;
+import me.prettyprint.hector.api.ddl.ComparatorType;
+
+import static me.prettyprint.hector.api.factory.HFactory.createColumnFamilyDefinition;
+import static org.apache.usergrid.persistence.cassandra.CassandraPersistenceUtils.getCfDefs;
 import static org.apache.usergrid.persistence.cassandra.CassandraService.APPLICATIONS_CF;
 import static org.apache.usergrid.persistence.cassandra.CassandraService.DEFAULT_APPLICATION;
 import static org.apache.usergrid.persistence.cassandra.CassandraService.DEFAULT_ORGANIZATION;
@@ -42,12 +53,6 @@ import static org.apache.usergrid.persistence.cassandra.CassandraService.SYSTEM_
 import static org.apache.usergrid.persistence.cassandra.CassandraService.TOKENS_CF;
 import static org.apache.usergrid.persistence.cassandra.CassandraService.USE_VIRTUAL_KEYSPACES;
 import static org.apache.usergrid.persistence.cassandra.CassandraService.keyspaceForApplication;
-import org.apache.usergrid.persistence.cassandra.Setup;
-import org.apache.usergrid.persistence.core.migration.MigrationException;
-import org.apache.usergrid.persistence.core.migration.MigrationManager;
-import org.apache.usergrid.persistence.entities.Application;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -93,6 +98,7 @@ public class CpSetup implements Setup {
 
             ConfigurationManager.loadCascadedPropertiesFromResources( "corepersistence" );
 
+            //remove below code and fix it to just use the new properties instead of using the hybrid properties
             String hostsString = "";
             CassandraHost[] hosts = cass.getCassandraHostConfigurator().buildCassandraHosts();
             if ( hosts.length == 0 ) {

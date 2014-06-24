@@ -132,6 +132,7 @@ public class CassandraService {
 
     public CassandraService( Properties properties, Cluster cluster,
                              CassandraHostConfigurator cassandraHostConfigurator, LockManager lockManager ) {
+        //spring injects the properties here, and so we'll need to make sure the new properties gets injected
         this.properties = properties;
         this.cluster = cluster;
         chc = cassandraHostConfigurator;
