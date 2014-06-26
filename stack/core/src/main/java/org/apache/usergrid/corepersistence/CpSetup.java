@@ -112,7 +112,7 @@ public class CpSetup implements Setup {
             Properties cpProps = new Properties();
             cpProps.put("cassandra.hosts", hostsString);
             cpProps.put("cassandra.port", hosts[0].getPort());
-            
+
             ConfigurationManager.loadProperties( cpProps );
             logger.debug("Set Cassandra properties for Core Persistence: " + cpProps.toString() );
         }
