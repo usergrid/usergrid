@@ -28,6 +28,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 
+import org.apache.usergrid.management.exceptions.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,15 +41,6 @@ import org.apache.usergrid.management.ManagementService;
 import org.apache.usergrid.management.OrganizationInfo;
 import org.apache.usergrid.management.OrganizationOwnerInfo;
 import org.apache.usergrid.management.UserInfo;
-import org.apache.usergrid.management.exceptions.DisabledAdminUserException;
-import org.apache.usergrid.management.exceptions.DisabledAppUserException;
-import org.apache.usergrid.management.exceptions.IncorrectPasswordException;
-import org.apache.usergrid.management.exceptions.ManagementException;
-import org.apache.usergrid.management.exceptions.RecentlyUsedPasswordException;
-import org.apache.usergrid.management.exceptions.UnableToLeaveOrganizationException;
-import org.apache.usergrid.management.exceptions.UnactivatedAdminUserException;
-import org.apache.usergrid.management.exceptions.UnactivatedAppUserException;
-import org.apache.usergrid.management.exceptions.UnconfirmedAdminUserException;
 import org.apache.usergrid.persistence.CredentialsInfo;
 import org.apache.usergrid.persistence.Entity;
 import org.apache.usergrid.persistence.EntityManager;
@@ -212,6 +204,7 @@ public class ManagementServiceImpl implements ManagementService {
     public static final String REGISTRATION_REQUIRES_ADMIN_APPROVAL = "registration_requires_admin_approval";
     public static final String REGISTRATION_REQUIRES_EMAIL_CONFIRMATION = "registration_requires_email_confirmation";
     public static final String NOTIFY_ADMIN_OF_NEW_USERS = "notify_admin_of_new_users";
+    public static final String ALLOW_OPEN_REGISTRATION = "allow_open_registration";
 
     protected ServiceManagerFactory smf;
 
@@ -349,8 +342,7 @@ public class ManagementServiceImpl implements ManagementService {
         long timestamp = System.currentTimeMillis();
         ByteBuffer bytes = ByteBuffer.allocate( 20 );
         bytes.put( sha( timestamp + OAUTH_SECRET_SALT + UUID.randomUUID() ) );
-        String secret = type.getBase64Prefix() + encodeBase64URLSafeString( bytes.array() );
-        return secret;
+        return type.getBase64Prefix() + encodeBase64URLSafeString( bytes.array() );
     }
 
 
@@ -792,11 +784,10 @@ public class ManagementServiceImpl implements ManagementService {
                 user.getDynamicProperties() );
 
         // special case for sysadmin and test account only
-        if ( !user.getEmail().equals( properties.getProperty( PROPERTIES_SYSADMIN_LOGIN_EMAIL ) ) && !user.getEmail()
-                                                                                                          .equals(
-                                                                                                                  properties
-                                                                                                                          .getProperty(
-                                                                                                                                  PROPERTIES_TEST_ACCOUNT_ADMIN_USER_EMAIL ) ) ) {
+        String sysAdminLoginEmail =  properties.getProperty( PROPERTIES_SYSADMIN_LOGIN_EMAIL );
+        String testAdminUserEmail = properties.getProperty( PROPERTIES_TEST_ACCOUNT_ADMIN_USER_EMAIL );
+        if (  !user.getEmail().equals( sysAdminLoginEmail )
+                && !user.getEmail().equals( testAdminUserEmail ) ) {
             this.startAdminUserActivationFlow( userInfo );
         }
 
@@ -1403,8 +1394,7 @@ public class ManagementServiceImpl implements ManagementService {
     @Override
     public Entity getAdminUserEntityFromAccessToken( String token ) throws Exception {
 
-        Entity user = getEntityFromAccessToken( token, null, ADMIN_USER );
-        return user;
+        return getEntityFromAccessToken( token, null, ADMIN_USER );
     }
 
 
@@ -1427,11 +1417,10 @@ public class ManagementServiceImpl implements ManagementService {
         Results results = em.getCollection( new SimpleEntityRef( User.ENTITY_TYPE, userId ), "groups", null, 10000,
                 Level.ALL_PROPERTIES, false );
 
-        String path = null;
 
         for ( Entity entity : results.getEntities() ) {
 
-            path = ( String ) entity.getProperty( "path" );
+            String path = ( String ) entity.getProperty( "path" );
 
             if ( path != null ) {
                 path = path.toLowerCase();
@@ -1583,6 +1572,10 @@ public class ManagementServiceImpl implements ManagementService {
 
         if ( properties == null ) {
             properties = new HashMap<String, Object>();
+        }
+
+        if( properties.containsKey("name")){
+            properties.remove("name");
         }
 
         OrganizationInfo organizationInfo = getOrganizationByUuid( organizationId );
@@ -2152,11 +2145,15 @@ public class ManagementServiceImpl implements ManagementService {
 
 
     @Override
-    public void sendOrganizationEmail( OrganizationInfo organization, String subject, String html ) throws Exception {
-        List<UserInfo> users = getAdminUsersForOrganization( organization.getUuid() );
-        for ( UserInfo user : users ) {
-            sendHtmlMail( properties, user.getDisplayEmailAddress(), properties.getProperty( PROPERTIES_MAILER_EMAIL ),
-                    subject, appendEmailFooter( html ) );
+    public void sendOrganizationEmail(OrganizationInfo organization, String subject, String html) throws Exception {
+        List<UserInfo> users = getAdminUsersForOrganization(organization.getUuid());
+        for (UserInfo user : users) {
+            if (StringUtils.isNotBlank(user.getEmail())) {
+                sendHtmlMail(properties, user.getDisplayEmailAddress(), properties.getProperty(PROPERTIES_MAILER_EMAIL),
+                        subject, appendEmailFooter(html));
+            } else {
+                throw new MissingEmailException();
+            }
         }
     }
 
@@ -2276,9 +2273,11 @@ public class ManagementServiceImpl implements ManagementService {
 
 
     @Override
-    public void sendAdminUserEmail( UserInfo user, String subject, String html ) throws Exception {
-        sendHtmlMail( properties, user.getDisplayEmailAddress(), properties.getProperty( PROPERTIES_MAILER_EMAIL ),
-                subject, appendEmailFooter( html ) );
+    public void sendAdminUserEmail(UserInfo user, String subject, String html) throws Exception {
+        if (StringUtils.isNotBlank(user.getEmail())) {
+            sendHtmlMail(properties, user.getDisplayEmailAddress(), properties.getProperty(PROPERTIES_MAILER_EMAIL),
+                    subject, appendEmailFooter(html));
+        }
     }
 
 
@@ -2434,30 +2433,43 @@ public class ManagementServiceImpl implements ManagementService {
 
     @Override
     public boolean newAppUsersNeedAdminApproval( UUID applicationId ) throws Exception {
-        EntityManager em = emf.getEntityManager( applicationId );
-        Boolean registration_requires_admin_approval = ( Boolean ) em
-                .getProperty( new SimpleEntityRef( Application.ENTITY_TYPE, applicationId ),
-                        REGISTRATION_REQUIRES_ADMIN_APPROVAL );
-        return registration_requires_admin_approval != null && registration_requires_admin_approval.booleanValue();
+//        return checkApplicationBooleanProperty(applicationId, REGISTRATION_REQUIRES_ADMIN_APPROVAL, false);
+        EntityManager em = emf.getEntityManager(applicationId);
+        Application application = em.getApplication();
+        return application.registrationRequiresAdminApproval();
     }
 
 
     @Override
     public boolean newAppUsersRequireConfirmation( UUID applicationId ) throws Exception {
-        EntityManager em = emf.getEntityManager( applicationId );
-        Boolean registration_requires_email_confirmation = ( Boolean ) em
-                .getProperty( new SimpleEntityRef( Application.ENTITY_TYPE, applicationId ),
-                        REGISTRATION_REQUIRES_EMAIL_CONFIRMATION );
-        return registration_requires_email_confirmation != null && registration_requires_email_confirmation.booleanValue();
+//        return checkApplicationBooleanProperty(applicationId, REGISTRATION_REQUIRES_EMAIL_CONFIRMATION, false);
+        EntityManager em = emf.getEntityManager(applicationId);
+        Application application = em.getApplication();
+        return application.registrationRequiresEmailConfirmation();
     }
 
 
+    @Override
+    public boolean appAllowOpenRegistration( UUID applicationId ) throws Exception{
+        EntityManager em = emf.getEntityManager(applicationId);
+        Application application = em.getApplication();
+        return application.allowOpenRegistration();
+//        return checkApplicationBooleanProperty(applicationId, ALLOW_OPEN_REGISTRATION, true);
+    }
+
     public boolean notifyAdminOfNewAppUsers( UUID applicationId ) throws Exception {
+//        return checkApplicationBooleanProperty(applicationId, NOTIFY_ADMIN_OF_NEW_USERS, false);
+        EntityManager em = emf.getEntityManager(applicationId);
+        Application application = em.getApplication();
+        return application.notifyAdminOfNewUsers();
+    }
+
+    private boolean checkApplicationBooleanProperty(UUID applicationId, String property, boolean defaultValue) throws Exception{
         EntityManager em = emf.getEntityManager( applicationId );
-        Boolean notify_admin_of_new_users = ( Boolean ) em
+        Boolean value = ( Boolean ) em
                 .getProperty( new SimpleEntityRef( Application.ENTITY_TYPE, applicationId ),
-                        NOTIFY_ADMIN_OF_NEW_USERS );
-        return notify_admin_of_new_users != null && notify_admin_of_new_users.booleanValue();
+                        property);
+        return value != null ? value : defaultValue;
     }
 
 
@@ -2520,6 +2532,9 @@ public class ManagementServiceImpl implements ManagementService {
 
 
     public void sendAppUserConfirmationEmail( UUID applicationId, User user ) throws Exception {
+        if (StringUtils.isBlank(user.getEmail())) {
+            throw new MissingEmailException();
+        }
         String token = getConfirmationTokenForAppUser( applicationId, user.getUuid() );
         String confirmation_url =
                 buildUserAppUrl( applicationId, properties.getProperty( PROPERTIES_USER_CONFIRMATION_URL ), user,
@@ -2653,9 +2668,11 @@ public class ManagementServiceImpl implements ManagementService {
     }
 
 
-    public void sendAppUserEmail( User user, String subject, String html ) throws Exception {
-        sendHtmlMail( properties, user.getDisplayEmailAddress(), properties.getProperty( PROPERTIES_MAILER_EMAIL ),
-                subject, appendEmailFooter( html ) );
+    public void sendAppUserEmail(User user, String subject, String html) throws Exception {
+        if (StringUtils.isNotBlank(user.getEmail())) {
+            sendHtmlMail(properties, user.getDisplayEmailAddress(), properties.getProperty(PROPERTIES_MAILER_EMAIL),
+                    subject, appendEmailFooter(html));
+        }
     }
 
 
@@ -2684,10 +2701,7 @@ public class ManagementServiceImpl implements ManagementService {
     public void sendAppUserPin( UUID applicationId, UUID userId ) throws Exception {
         EntityManager em = emf.getEntityManager( applicationId );
         User user = em.get( userId, User.class );
-        if ( user == null ) {
-            return;
-        }
-        if ( user.getEmail() == null ) {
+        if ( user == null || StringUtils.isBlank(user.getEmail()) ) {
             return;
         }
         String pin = getCredentialsSecret( readUserPin( applicationId, userId ) );
@@ -2862,12 +2876,8 @@ public class ManagementServiceImpl implements ManagementService {
 
     private boolean verify( UUID applicationId, UUID userId, String password ) throws Exception {
         CredentialsInfo ci = readUserPasswordCredentials( applicationId, userId );
+        return ci != null && encryptionService.verify(password, ci, userId, applicationId);
 
-        if ( ci == null ) {
-            return false;
-        }
-
-        return encryptionService.verify( password, ci, userId, applicationId );
     }
 
 

@@ -76,16 +76,16 @@ public class Application extends TypedEntity {
     protected Boolean disabled;
 
     @EntityProperty(name = "allow_open_registration", indexed = false)
-    protected Boolean allowOpenRegistration;
+    protected Boolean allowOpenRegistration = true;
 
     @EntityProperty(name = "registration_requires_email_confirmation", indexed = false)
-    protected Boolean registrationRequiresEmailConfirmation;
+    protected Boolean registrationRequiresEmailConfirmation = false;
 
     @EntityProperty(name = "registration_requires_admin_approval", indexed = false)
-    protected Boolean registrationRequiresAdminApproval;
+    protected Boolean registrationRequiresAdminApproval = false;
 
     @EntityProperty(name = "notify_admin_of_new_users", indexed = false)
-    protected Boolean notifyAdminOfNewUsers;
+    protected Boolean notifyAdminOfNewUsers = false;
 
     @EntityDictionary(keyType = java.lang.String.class, valueType = OAuthProvider.class)
     protected Map<String, OAuthProvider> oauthproviders;
@@ -198,12 +198,11 @@ public class Application extends TypedEntity {
 
 
     public boolean allowOpenRegistration() {
-        return ( allowOpenRegistration != null ) && allowOpenRegistration;
+        return allowOpenRegistration;
     }
 
 
     @JsonProperty("allow_open_registration")
-    @JsonSerialize(include = Inclusion.NON_NULL)
     public Boolean getAllowOpenRegistration() {
         return allowOpenRegistration;
     }
@@ -215,13 +214,12 @@ public class Application extends TypedEntity {
     }
 
 
-    public boolean registrationRequiresEmailConfirmation() {
-        return ( registrationRequiresEmailConfirmation != null ) && registrationRequiresEmailConfirmation;
+    public Boolean registrationRequiresEmailConfirmation() {
+        return registrationRequiresEmailConfirmation;
     }
 
 
     @JsonProperty("registration_requires_email_confirmation")
-    @JsonSerialize(include = Inclusion.NON_NULL)
     public Boolean getRegistrationRequiresEmailConfirmation() {
         return registrationRequiresEmailConfirmation;
     }
@@ -233,12 +231,11 @@ public class Application extends TypedEntity {
     }
 
 
-    public boolean registrationRequiresAdminApproval() {
-        return ( registrationRequiresAdminApproval != null ) && registrationRequiresAdminApproval;
+    public Boolean registrationRequiresAdminApproval() {
+        return registrationRequiresAdminApproval;
     }
 
 
-    @JsonSerialize(include = Inclusion.NON_NULL)
     @JsonProperty("registration_requires_admin_approval")
     public Boolean getRegistrationRequiresAdminApproval() {
         return registrationRequiresAdminApproval;
@@ -251,12 +248,11 @@ public class Application extends TypedEntity {
     }
 
 
-    public boolean notifyAdminOfNewUsers() {
-        return ( notifyAdminOfNewUsers != null ) && notifyAdminOfNewUsers;
+    public Boolean notifyAdminOfNewUsers() {
+        return notifyAdminOfNewUsers;
     }
 
 
-    @JsonSerialize(include = Inclusion.NON_NULL)
     @JsonProperty("notify_admin_of_new_users")
     public Boolean getNotifyAdminOfNewUsers() {
         return notifyAdminOfNewUsers;
@@ -426,6 +422,7 @@ public class Application extends TypedEntity {
 
 
     /** @return the accesstokenttl */
+    @JsonSerialize(include = Inclusion.NON_NULL)
     public Long getAccesstokenttl() {
         return accesstokenttl;
     }

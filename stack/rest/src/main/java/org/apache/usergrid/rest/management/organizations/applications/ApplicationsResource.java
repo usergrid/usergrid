@@ -98,6 +98,7 @@ public class ApplicationsResource extends AbstractContextResource {
     public JSONWithPadding newApplicationForOrganization( @Context UriInfo ui, Map<String, Object> json,
                                                           @QueryParam( "callback" ) @DefaultValue( "callback" )
                                                           String callback ) throws Exception {
+        Preconditions.checkArgument((json != null && json.containsKey("name")), "The 'name' parameter is required and cannot be empty");
         String applicationName = ( String ) json.get( "name" );
         return newApplicationForOrganizationFromForm( ui, json, callback, applicationName );
     }
@@ -118,7 +119,7 @@ public class ApplicationsResource extends AbstractContextResource {
         ApiResponse response = createApiResponse();
         response.setAction( "new application for organization" );
 
-        ApplicationInfo applicationInfo = management.createApplication( organization.getUuid(), applicationName );
+        ApplicationInfo applicationInfo = management.createApplication( organization.getUuid(), applicationName, json );
 
         LinkedHashMap<String, UUID> applications = new LinkedHashMap<String, UUID>();
         applications.put( applicationInfo.getName(), applicationInfo.getId() );

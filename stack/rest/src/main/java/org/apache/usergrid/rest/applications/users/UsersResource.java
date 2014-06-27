@@ -36,7 +36,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.PathSegment;
 import javax.ws.rs.core.UriInfo;
 
+import org.apache.usergrid.persistence.entities.Application;
 import org.apache.usergrid.rest.RootResource;
+import org.apache.usergrid.security.shiro.utils.SubjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Scope;
@@ -60,6 +62,7 @@ import net.tanesha.recaptcha.ReCaptchaResponse;
 
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
+import static org.apache.usergrid.rest.exceptions.SecurityException.mappableSecurityException;
 import static org.apache.usergrid.services.ServiceParameter.addParameter;
 
 
@@ -204,6 +207,9 @@ public class UsersResource extends ServiceResource {
         }
         return super.executePut( ui, json, callback );
     }
+    private boolean hasAdminAccess() {
+        return SubjectUtils.isApplicationAdmin() || SubjectUtils.isOrganizationAdmin();
+    }
 
 
     @POST
@@ -215,14 +221,13 @@ public class UsersResource extends ServiceResource {
         Object json = body.getEntity();
         String password = null;
         String pin = null;
+        boolean allowOpenRegistration = management.appAllowOpenRegistration(getApplicationId());
+        if (!allowOpenRegistration && !hasAdminAccess()) {
+            throw mappableSecurityException("unauthorized", "registration is not open, please contact the app admin");
+        }
 
-        Boolean registration_requires_email_confirmation = ( Boolean ) this.getServices().getEntityManager()
-                                                                           .getProperty( this.getServices()
-                                                                                             .getApplicationRef(),
-                                                                                   "registration_requires_email_confirmation" );
-        boolean activated =
-                !( ( registration_requires_email_confirmation != null ) && registration_requires_email_confirmation );
 
+        boolean activated = !management.newAppUsersRequireConfirmation(getApplicationId());
         if ( json instanceof Map ) {
             @SuppressWarnings("unchecked") Map<String, Object> map = ( Map<String, Object> ) json;
             password = ( String ) map.get( "password" );
