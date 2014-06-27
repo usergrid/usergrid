@@ -220,7 +220,20 @@ set the response limit in UGQuery as well.
 // get entity connections
 -(UGClientResponse *)getEntityConnections: (NSString *)connectorType connectorID:(NSString *)connectorID connectionType:(NSString *)connectionType query:(UGQuery *)query;
 
-
+/*!
+ @abstract Get entities connected to the specified entity with the specified connection
+ @param connectorType
+ @param connectorID
+ @param connectionType
+ @param query
+ @return ApigeeClientResponse instance
+ @see ApigeeClientResponse ApigeeClientResponse
+ @see ApigeeQuery ApigeeQuery
+ */
+-(UGClientResponse *)getConnectedEntities:(NSString *)connectorType
+                                  connectorID:(NSString *)connectorID
+                               connectionType:(NSString *)connectionType
+                                        query:(UGQuery *)query;
 
 /********************* MESSAGE MANAGEMENT *********************/
 // post a message to a given queue
