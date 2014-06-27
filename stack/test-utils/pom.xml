@@ -73,31 +73,15 @@
       <version>${project.version}</version>
     </dependency>
 
-    <!--<dependency>-->
-    <!--<groupId>org.apache.usergrid</groupId>-->
-    <!--<artifactId>usergrid-services</artifactId>-->
-    <!--<version>${project.version}</version>-->
-    <!--</dependency>-->
-
-    <!-- Apache Dependencies -->
-
     <dependency>
       <groupId>org.apache.cassandra</groupId>
       <artifactId>cassandra-all</artifactId>
-      <!-- Exclude the old and problematic Snappy -->
-      <exclusions>
-        <exclusion>
-          <artifactId>snappy-java</artifactId>
-          <groupId>org.xerial.snappy</groupId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <!-- Include the slighly newer and less problematic snappy -->
     <dependency>
       <artifactId>snappy-java</artifactId>
       <groupId>org.xerial.snappy</groupId>
-      <version>1.0.5</version>
     </dependency>
 
     <dependency>
@@ -248,17 +232,6 @@
       <scope>test</scope>
     </dependency>
 
-    <!--<dependency>-->
-    <!--<groupId>org.slf4j</groupId>-->
-    <!--<artifactId>slf4j-log4j12</artifactId>-->
-    <!--<scope>test</scope>-->
-    <!--</dependency>-->
-
-    <!--<dependency>-->
-    <!--<groupId>log4j</groupId>-->
-    <!--<artifactId>log4j</artifactId>-->
-    <!--<scope>test</scope>-->
-    <!--</dependency>-->
 
     <dependency>
       <groupId>junit</groupId>

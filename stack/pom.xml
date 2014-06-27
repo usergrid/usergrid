@@ -98,21 +98,21 @@
     <amber-version>0.22-incubating</amber-version>
     <cassandra-version>1.2.12</cassandra-version>
     <hector-om-version>3.0-03</hector-om-version>
-    <hector-version>1.1-4</hector-version>
+    <hector-version>2.0-0</hector-version>
     <hector-test-version>1.1-4</hector-test-version>
-    <jackson-version>1.9.9</jackson-version>
+    <jackson-version>1.9.13</jackson-version>
     <jclouds.version>1.6.2-incubating</jclouds.version>
     <jersey-version>1.18</jersey-version>
     <junit-version>4.11</junit-version>
     <log4j-version>1.2.16</log4j-version>
     <metrics-version>2.1.2</metrics-version>
     <org.springframework.version>3.1.2.RELEASE</org.springframework.version>
-    <shiro-version>1.2.0</shiro-version>
-    <slf4j-version>1.6.1</slf4j-version>
+    <shiro-version>1.2.3</shiro-version>
+    <slf4j-version>1.7.7</slf4j-version>
     <snakeyaml-version>1.8</snakeyaml-version>
     <tomcat-version>7.0.42</tomcat-version>
     <antlr.version>3.4</antlr.version>
-    <tika.version>1.4</tika.version>
+    <tika.version>1.5</tika.version>
 
   </properties>
 
@@ -428,11 +428,17 @@
           </exclusion>
 
           <exclusion>
-                   <artifactId>snappy-java</artifactId>
-                   <groupId>org.xerial.snappy</groupId>
-            </exclusion>
+             <artifactId>snappy-java</artifactId>
+             <groupId>org.xerial.snappy</groupId>
+          </exclusion>
         </exclusions>
       </dependency>
+
+        <dependency>
+            <artifactId>snappy-java</artifactId>
+            <groupId>org.xerial.snappy</groupId>
+            <version>1.1.1-M3</version>
+        </dependency>
 
       <dependency>
         <groupId>org.apache.lucene</groupId>
@@ -596,6 +602,11 @@
             <groupId>javax.activation</groupId>
             <artifactId>activation</artifactId>
           </exclusion>
+            <exclusion>
+                <groupId>javax.xml.bind</groupId>
+                <artifactId>jaxb-api</artifactId>
+            </exclusion>
+
         </exclusions>
       </dependency>
 
@@ -814,6 +825,7 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
           </exclusion>
+
         </exclusions>
       </dependency>
 
@@ -882,12 +894,18 @@
         <groupId>org.codehaus.jettison</groupId>
         <artifactId>jettison</artifactId>
         <version>1.2</version>
+          <exclusions>
+              <exclusion>
+                  <groupId>stax</groupId>
+                  <artifactId>stax-api</artifactId>
+              </exclusion>
+          </exclusions>
       </dependency>
 
       <dependency>
-        <groupId>org.jboss.netty</groupId>
+        <groupId>io.netty</groupId>
         <artifactId>netty</artifactId>
-        <version>3.2.7.Final</version>
+        <version>3.6.6.Final</version>
       </dependency>
 
       <dependency>
@@ -1198,7 +1216,7 @@
       <dependency>
         <groupId>junit</groupId>
         <artifactId>junit-dep</artifactId>
-        <version>4.10</version>
+        <version>4.11</version>
       </dependency>
 
       <dependency>
@@ -1251,6 +1269,12 @@
         <groupId>org.apache.jclouds.driver</groupId>
         <artifactId>jclouds-netty</artifactId>
         <version>${jclouds.version}</version>
+          <exclusions>
+              <exclusion>
+                  <groupId>io.netty</groupId>
+                  <artifactId>netty</artifactId>
+              </exclusion>
+          </exclusions>
       </dependency>
 
       <dependency>
