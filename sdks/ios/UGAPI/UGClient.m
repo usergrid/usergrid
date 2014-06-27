@@ -1059,6 +1059,15 @@ NSString *g_deviceUUID = nil;
     return [self httpTransaction:url op:kUGHTTPPost opData:nil];
 }
 
+-(UGClientResponse *)getConnectedEntities: (NSString *)connectorType connectorID:(NSString *)connectorID connectionType:(NSString *)connectionType query:(UGQuery *)query
+{
+    NSMutableString *url = [self createURL:connectorType append2:connectorID append3: @"connecting" append4: connectionType];
+    if (query) {
+        [self appendQueryToURL:url query:query];
+    }
+    return [self httpTransaction:url op:kApigeeHTTPGet opData:nil];
+}
+
 /************************** MESSAGE MANAGEMENT **************************/
 /************************** MESSAGE MANAGEMENT **************************/
 /************************** MESSAGE MANAGEMENT **************************/
