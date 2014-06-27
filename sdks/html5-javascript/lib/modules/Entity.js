@@ -381,17 +381,59 @@ Usergrid.Entity.prototype.getEntityId = function(entity) {
 };
 
 /*
- *  gets an entities connections
+ *  gets entities this entity is connecting to
  *
  *  @method getConnections
  *  @public
  *  @param {string} connection
- *  @param {object} entity
  *  @param {function} callback
  *  @return {callback} callback(err, data, connections)
  *
  */
 Usergrid.Entity.prototype.getConnections = function(connection, callback) {
+
+  this.connectionGetter (connection, 'connecting', function (err, data) {
+    if (!err) {
+      doCallback(callback, [err, data, data.entities], self);
+    } else {
+      doCallback(callback, [null, data, data.entities], self);
+    }
+  });
+
+};
+
+/*
+ *  gets the entities that are connected to this entity
+ *
+ *  @method getConnections
+ *  @public
+ *  @param {string} connection
+ *  @param {function} callback
+ *  @return {callback} callback(err, data, connections)
+ *
+ */
+Usergrid.Entity.prototype.getConnectedEntities = function(connection, callback) {
+
+  this.connectionGetter (connection, 'connected', function (err, data) {
+    if (!err) {
+      doCallback(callback, [err, data, data.entities], self);
+    } else {
+      doCallback(callback, [null, data, data.entities], self);
+    }
+  });
+};
+
+/*
+ *  Worker that gets the entities that an entity are connecting to or connected by
+ *
+ *  @method connectionGetter
+ *  @public
+ *  @param {string} connection
+ *  @param connectedOrConnecting
+ *  @return {callback} callback(err, data, connections)
+ *
+ */
+Usergrid.Entity.prototype.connectionGetter = function(connection, connectedOrConnecting, callback) {
 
   var self = this;
 
@@ -409,14 +451,18 @@ Usergrid.Entity.prototype.getConnections = function(connection, callback) {
     return;
   }
 
-  var endpoint = connectorType + '/' + connector + '/' + connection + '/';
+  if (connectedOrConnecting == 'connected') {
+    var endpoint = connectorType + '/' + connector + '/connecting/' + connection + '/';
+  } else if (connectedOrConnecting == 'connecting') {
+    var endpoint = connectorType + '/' + connector + '/' + connection + '/';
+  }
   var options = {
     method: 'GET',
     endpoint: endpoint
   };
   this._client.request(options, function(err, data) {
     if (err && self._client.logging) {
-      console.log('entity could not be connected');
+      console.log('could not get connections');
     }
 
     self[connection] = {};
