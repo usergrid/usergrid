@@ -366,7 +366,7 @@
               <groupId>${project.groupId}</groupId>
               <version>${project.version}</version>
               <file>
-                ${project.build.directory}/${project.artifactId}-${project.version}.jar
+                ${project.build.directory}/${project.artifactId}-${project.version}-classes.jar
               </file>
             </configuration>
           </execution>

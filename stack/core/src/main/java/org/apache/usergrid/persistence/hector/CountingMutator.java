@@ -316,6 +316,18 @@ public class CountingMutator<K> implements Mutator<K> {
         return target.getPendingMutationCount();
     }
 
+    @Override
+    public <N> Mutator<K> addDeletion(K k, String s, N n, N n2, Serializer<N> nSerializer) {
+        target.addDeletion(k, s, n, n2, nSerializer);
+        return this;
+    }
+
+    @Override
+    public <N> Mutator<K> addDeletion(K k, String s, N n, N n2, Serializer<N> nSerializer, long l) {
+        target.addDeletion(k, s, n, n2, nSerializer, l);
+        checkAndFlush();
+        return this;
+    }
 
     /**
      * If our size is >= than our max, we'll flush
