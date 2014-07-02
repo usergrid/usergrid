@@ -103,22 +103,22 @@ public class EdgeShardSerializationTest {
         batch.execute();
 
 
-        Iterator<Long> results = edgeShardSerialization.getEdgeMetaData( scope, now, Optional.<Long>absent(), types );
+        Iterator<Shard> results = edgeShardSerialization.getEdgeMetaData( scope, now, Optional.<Shard>absent(), types );
 
-        assertEquals( slice3, results.next().longValue() );
+        assertEquals( slice3, results.next().getShardIndex() );
 
-        assertEquals( slice2, results.next().longValue() );
+        assertEquals( slice2, results.next().getShardIndex() );
 
-        assertEquals( slice1, results.next().longValue() );
+        assertEquals( slice1, results.next().getShardIndex() );
 
         assertFalse( results.hasNext() );
 
         //test paging and size
-        results = edgeShardSerialization.getEdgeMetaData( scope, now, Optional.of( slice2 ), types );
+        results = edgeShardSerialization.getEdgeMetaData( scope, now, Optional.of( new Shard( slice2, 0l ) ), types );
 
-        assertEquals( slice2, results.next().longValue() );
+        assertEquals( slice2, results.next().getShardIndex() );
 
-        assertEquals( slice1, results.next().longValue() );
+        assertEquals( slice1, results.next().getShardIndex() );
 
 
         assertFalse( results.hasNext() );
@@ -147,24 +147,24 @@ public class EdgeShardSerializationTest {
         batch.execute();
 
 
-        Iterator<Long> results = edgeShardSerialization.getEdgeMetaData( scope, now, Optional.<Long>absent(), types );
+        Iterator<Shard> results = edgeShardSerialization.getEdgeMetaData( scope, now, Optional.<Shard>absent(), types );
 
-        assertEquals( slice3, results.next().longValue() );
+        assertEquals( slice3, results.next().getShardIndex() );
 
-        assertEquals( slice2, results.next().longValue() );
+        assertEquals( slice2, results.next().getShardIndex() );
 
-        assertEquals( slice1, results.next().longValue() );
+        assertEquals( slice1, results.next().getShardIndex() );
 
         assertFalse( results.hasNext() );
 
         //test paging and size
         edgeShardSerialization.removeEdgeMeta( scope, now, slice1, types ).execute();
 
-        results = edgeShardSerialization.getEdgeMetaData( scope, now,Optional.<Long>absent(), types );
+        results = edgeShardSerialization.getEdgeMetaData( scope, now,Optional.<Shard>absent(), types );
 
-        assertEquals( slice3, results.next().longValue() );
+        assertEquals( slice3, results.next().getShardIndex() );
 
-        assertEquals( slice2, results.next().longValue() );
+        assertEquals( slice2, results.next().getShardIndex() );
 
         assertFalse( results.hasNext() );
 
@@ -173,7 +173,7 @@ public class EdgeShardSerializationTest {
 
         edgeShardSerialization.removeEdgeMeta( scope, now, slice3, types ).execute();
 
-        results = edgeShardSerialization.getEdgeMetaData( scope, now, Optional.<Long>absent(), types );
+        results = edgeShardSerialization.getEdgeMetaData( scope, now, Optional.<Shard>absent(), types );
 
 
         assertFalse( results.hasNext() );

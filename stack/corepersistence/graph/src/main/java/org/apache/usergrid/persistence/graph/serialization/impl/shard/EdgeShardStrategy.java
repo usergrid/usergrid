@@ -37,7 +37,8 @@ public interface EdgeShardStrategy {
      * @param timestamp The timestamp on the edge
      * @param types The types in the edge
      */
-    public long getWriteShard(final ApplicationScope scope, final Id rowKeyId, final  long timestamp, final String... types );
+    public ShardEntries getWriteShards( final ApplicationScope scope, final Id rowKeyId, final long timestamp,
+                                           final String... types );
 
 
     /**
@@ -48,7 +49,7 @@ public interface EdgeShardStrategy {
      * @param maxTimestamp The max timestamp to use
      * @param types the types in the edge
      */
-    public Iterator<Long> getReadShards(final ApplicationScope scope,final  Id rowKeyId, final long maxTimestamp,final  String... types );
+    public Iterator<ShardEntries> getReadShards(final ApplicationScope scope,final  Id rowKeyId, final long maxTimestamp,final  String... types );
 
     /**
      * Increment our count meta data by the passed value.  Can be a positive or a negative number.

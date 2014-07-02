@@ -33,6 +33,7 @@ import org.apache.usergrid.persistence.graph.exception.GraphRuntimeException;
 import org.apache.usergrid.persistence.graph.serialization.impl.shard.EdgeShardSerialization;
 import org.apache.usergrid.persistence.graph.serialization.impl.shard.NodeShardAllocation;
 import org.apache.usergrid.persistence.graph.serialization.impl.shard.NodeShardApproximation;
+import org.apache.usergrid.persistence.graph.serialization.impl.shard.Shard;
 import org.apache.usergrid.persistence.graph.serialization.impl.shard.count.NodeShardCounterSerialization;
 import org.apache.usergrid.persistence.graph.serialization.impl.shard.count.ShardKey;
 import org.apache.usergrid.persistence.model.entity.Id;
@@ -69,12 +70,12 @@ public class NodeShardAllocationImpl implements NodeShardAllocation {
 
 
     @Override
-    public Iterator<Long> getShards( final ApplicationScope scope, final Id nodeId, Optional<Long> maxShardId, final String... edgeTypes ) {
+    public Iterator<Shard> getShards( final ApplicationScope scope, final Id nodeId, Optional<Shard> maxShardId, final String... edgeTypes ) {
 
-        final Iterator<Long> existingShards =
+        final Iterator<Shard> existingShards =
                 edgeShardSerialization.getEdgeMetaData( scope, nodeId, maxShardId, edgeTypes );
 
-        final PushbackIterator<Long> pushbackIterator = new PushbackIterator( existingShards );
+        final PushbackIterator<Shard> pushbackIterator = new PushbackIterator( existingShards );
 //
 //
 //        final long now = timeService.getCurrentTime();
@@ -132,7 +133,7 @@ public class NodeShardAllocationImpl implements NodeShardAllocation {
          * Nothing to iterate, return an iterator with 0.
          */
         if(!pushbackIterator.hasNext()){
-            pushbackIterator.pushback( 0l );
+            pushbackIterator.pushback( new Shard(0l, 0l) );
         }
 
         return pushbackIterator;
@@ -142,7 +143,7 @@ public class NodeShardAllocationImpl implements NodeShardAllocation {
     @Override
     public boolean auditMaxShard( final ApplicationScope scope, final Id nodeId, final String... edgeType ) {
 
-        final Iterator<Long> maxShards = getShards( scope, nodeId, Optional.<Long>absent(), edgeType );
+        final Iterator<Shard> maxShards = getShards( scope, nodeId, Optional.<Shard>absent(), edgeType );
 
 
         //if the first shard has already been allocated, do nothing.
@@ -152,14 +153,14 @@ public class NodeShardAllocationImpl implements NodeShardAllocation {
             return false;
         }
 
-        final long maxShard = maxShards.next();
+        final Shard maxShard = maxShards.next();
 
         /**
          * Check out if we have a count for our shard allocation
          */
 
 
-        final long count = nodeShardApproximation.getCount( scope, nodeId, maxShard, edgeType );
+        final long count = nodeShardApproximation.getCount( scope, nodeId, maxShard.getShardIndex(), edgeType );
 
         if ( count < graphFig.getShardSize() ) {
             return false;

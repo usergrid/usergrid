@@ -34,6 +34,8 @@ import org.apache.usergrid.persistence.graph.GraphFig;
 import org.apache.usergrid.persistence.graph.exception.GraphRuntimeException;
 import org.apache.usergrid.persistence.graph.serialization.impl.shard.NodeShardAllocation;
 import org.apache.usergrid.persistence.graph.serialization.impl.shard.NodeShardCache;
+import org.apache.usergrid.persistence.graph.serialization.impl.shard.Shard;
+import org.apache.usergrid.persistence.graph.serialization.impl.shard.ShardEntries;
 import org.apache.usergrid.persistence.graph.serialization.util.IterableUtil;
 import org.apache.usergrid.persistence.model.entity.Id;
 
@@ -93,7 +95,8 @@ public class NodeShardCacheImpl implements NodeShardCache {
 
 
     @Override
-    public long getSlice( final ApplicationScope scope, final Id nodeId, final long timestamp, final String... edgeType ) {
+    public ShardEntries getWriteShards( final ApplicationScope scope, final Id nodeId, final long timestamp,
+                               final String... edgeType ) {
 
 
         final CacheKey key = new CacheKey( scope, nodeId, edgeType );
@@ -106,7 +109,7 @@ public class NodeShardCacheImpl implements NodeShardCache {
             throw new GraphRuntimeException( "Unable to load shard key for graph", e );
         }
 
-        final Long shardId = entry.getShardId( timestamp );
+        final ShardEntries shardId = entry.getShardId( timestamp );
 
         if ( shardId != null ) {
             return shardId;
@@ -118,8 +121,8 @@ public class NodeShardCacheImpl implements NodeShardCache {
 
 
     @Override
-    public Iterator<Long> getVersions( final ApplicationScope scope, final Id nodeId, final long maxTimestamp,
-                                       final String... edgeType ) {
+    public Iterator<ShardEntries> getReadShards( final ApplicationScope scope, final Id nodeId, final long maxTimestamp,
+                                     final String... edgeType ) {
         final CacheKey key = new CacheKey( scope, nodeId, edgeType );
               CacheEntry entry;
 
@@ -130,10 +133,10 @@ public class NodeShardCacheImpl implements NodeShardCache {
                   throw new GraphRuntimeException( "Unable to load shard key for graph", e );
               }
 
-        Iterator<Long> iterator = entry.getShards( maxTimestamp );
+        Iterator<ShardEntries> iterator = entry.getShards( maxTimestamp );
 
         if(iterator == null){
-            return Collections.<Long>emptyList().iterator();
+            return Collections.<ShardEntries>emptyList().iterator();
         }
 
         return iterator;
@@ -161,8 +164,8 @@ public class NodeShardCacheImpl implements NodeShardCache {
 //                          //TODO, we need to put some sort of upper bounds on this, it could possibly get too large
 
 
-                          final Iterator<Long> edges = nodeShardAllocation
-                                  .getShards( key.scope, key.id, Optional.<Long>absent(), key.types );
+                          final Iterator<Shard> edges = nodeShardAllocation
+                                  .getShards( key.scope, key.id, Optional.<Shard>absent(), key.types );
 
                           return new CacheEntry( edges );
                       }
@@ -224,13 +227,13 @@ public class NodeShardCacheImpl implements NodeShardCache {
         /**
          * Get the list of all segments
          */
-        private TreeSet<Long> shards;
+        private TreeSet<Shard> shards;
 
 
-        private CacheEntry( final Iterator<Long> shards ) {
+        private CacheEntry( final Iterator<Shard> shards ) {
             this.shards = new TreeSet<>( );
 
-            for ( Long shard : IterableUtil.wrap( shards ) ) {
+            for ( Shard shard : IterableUtil.wrap( shards ) ) {
                 this.shards.add( shard );
             }
         }
@@ -239,8 +242,9 @@ public class NodeShardCacheImpl implements NodeShardCache {
         /**
          * Get the shard's UUID for the uuid we're attempting to seek from
          */
-        public Long getShardId( final Long seek ) {
-            return this.shards.floor( seek );
+        public ShardEntries getShardId( final Long seek ) {
+            return bootstrapEntry();
+//            return this.shards.floor( seek );
         }
 
 
@@ -248,8 +252,13 @@ public class NodeShardCacheImpl implements NodeShardCache {
          * Get all shards <= this one in decending order
          * @return
          */
-        public Iterator<Long> getShards( final Long maxShard ){
-            return this.shards.headSet(maxShard, true  ).descendingIterator();
+        public Iterator<ShardEntries> getShards( final Long maxShard ){
+            return  Collections.singleton(bootstrapEntry() ).iterator();
+//            return this.shards.headSet(maxShard, true  ).descendingIterator();
+        }
+
+        private ShardEntries bootstrapEntry(){
+            return new ShardEntries( Collections.singleton( new Shard(0l, 0l) ) );
         }
     }
 

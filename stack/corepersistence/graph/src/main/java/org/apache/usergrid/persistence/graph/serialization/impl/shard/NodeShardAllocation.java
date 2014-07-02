@@ -44,7 +44,7 @@ public interface NodeShardAllocation {
      * @param edgeTypes
      * @return A list of all shards <= the current shard.  This will always return 0l if no shards are allocated
      */
-    public Iterator<Long> getShards( final ApplicationScope scope, final Id nodeId, Optional<Long> maxShardId,
+    public Iterator<Shard> getShards( final ApplicationScope scope, final Id nodeId, Optional<Shard> maxShardId,
                                      final String... edgeTypes );
 
 

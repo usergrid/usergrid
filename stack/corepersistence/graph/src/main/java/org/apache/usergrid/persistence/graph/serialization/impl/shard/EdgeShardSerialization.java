@@ -52,7 +52,7 @@ public interface EdgeShardSerialization extends Migration{
      * @param types The types to use
      * @return
      */
-    public Iterator<Long> getEdgeMetaData(ApplicationScope scope, Id nodeId, Optional<Long> start,  String... types);
+    public Iterator<Shard> getEdgeMetaData(ApplicationScope scope, Id nodeId, Optional<Shard> start,  String... types);
 
     /**
      * Remove the shard from the edge meta data from the types.

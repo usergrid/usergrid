@@ -31,8 +31,6 @@ import org.mockito.ArgumentCaptor;
 import org.apache.usergrid.persistence.core.consistency.TimeService;
 import org.apache.usergrid.persistence.core.scope.ApplicationScope;
 import org.apache.usergrid.persistence.graph.GraphFig;
-import org.apache.usergrid.persistence.graph.serialization.impl.shard.count.NodeShardCounterSerialization;
-import org.apache.usergrid.persistence.graph.serialization.impl.shard.count.ShardKey;
 import org.apache.usergrid.persistence.graph.serialization.impl.shard.impl.NodeShardAllocationImpl;
 import org.apache.usergrid.persistence.model.entity.Id;
 import org.apache.usergrid.persistence.model.util.UUIDGenerator;
@@ -46,7 +44,6 @@ import static org.apache.usergrid.persistence.graph.test.util.EdgeTestUtils.crea
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -109,7 +106,7 @@ public class NodeShardAllocationTest {
          */
         when( edgeShardSerialization
                 .getEdgeMetaData( same( scope ), same( nodeId ), any( Optional.class ),  same( type ),
-                        same( subType ) ) ).thenReturn( Collections.<Long>emptyList().iterator() );
+                        same( subType ) ) ).thenReturn( Collections.<Shard>emptyList().iterator() );
 
         final boolean result = approximation.auditMaxShard( scope, nodeId, type, subType );
 
@@ -148,7 +145,7 @@ public class NodeShardAllocationTest {
 
         when( timeService.getCurrentTime() ).thenReturn( timeservicetime );
 
-        final long futureShard =  timeservicetime + graphFig.getShardCacheTimeout() * 2 ;
+        final Shard futureShard =  new Shard(timeservicetime + graphFig.getShardCacheTimeout() * 2, timeservicetime) ;
 
         /**
          * Mock up returning a min shard, and a future shard
@@ -199,7 +196,7 @@ public class NodeShardAllocationTest {
          */
         when( edgeShardSerialization
                 .getEdgeMetaData( same( scope ), same( nodeId ), any( Optional.class ),  same( type ),
-                        same( subType ) ) ).thenReturn( Arrays.asList( 0l ).iterator() );
+                        same( subType ) ) ).thenReturn( Arrays.asList( new Shard(0l, 0l) ).iterator() );
 
 
         //return a shard size < our max by 1
@@ -251,7 +248,7 @@ public class NodeShardAllocationTest {
          */
         when( edgeShardSerialization
                 .getEdgeMetaData( same( scope ), same( nodeId ), any( Optional.class ),  same( type ),
-                        same( subType ) ) ).thenReturn( Arrays.asList( 0l ).iterator() );
+                        same( subType ) ) ).thenReturn( Arrays.asList( new Shard(0l, 0l) ).iterator() );
 
 
         final long shardCount = graphFig.getShardSize();
@@ -331,14 +328,16 @@ public class NodeShardAllocationTest {
         final long futureTime = timeService.getCurrentTime()  + 2 * graphFig.getShardCacheTimeout();
 
 
+        final Shard minShard = new Shard(0l, 0l);
+
         /**
          * Simulate slow node
          */
-        final long futureShard1 = futureTime - 1;
+        final Shard futureShard1 = new Shard(futureTime - 1, timeservicetime);
 
-        final long futureShard2 = futureTime + 10000;
+        final Shard futureShard2 = new Shard(futureTime + 10000, timeservicetime);
 
-        final long futureShard3 = futureShard2 + 10000;
+        final Shard futureShard3 = new Shard(futureShard2.getShardIndex() + 10000, timeservicetime);
 
 
         final int pageSize = 100;
@@ -348,7 +347,7 @@ public class NodeShardAllocationTest {
          */
         when( edgeShardSerialization
                 .getEdgeMetaData( same( scope ), same( nodeId ), any( Optional.class ), same( type ),
-                        same( subType ) ) ).thenReturn( Arrays.asList(futureShard3, futureShard2, futureShard1, 0l).iterator() );
+                        same( subType ) ) ).thenReturn( Arrays.asList(futureShard3, futureShard2, futureShard1, minShard).iterator() );
 
 
 
@@ -363,17 +362,17 @@ public class NodeShardAllocationTest {
                 .thenReturn( mock( MutationBatch.class ) );
 
 
-        final Iterator<Long>
-                result = approximation.getShards( scope, nodeId, Optional.<Long>absent(), type, subType );
+        final Iterator<Shard>
+                result = approximation.getShards( scope, nodeId, Optional.<Shard>absent(), type, subType );
 
 
         assertTrue( "Shards present", result.hasNext() );
 
-        assertEquals("Only single next shard returned", futureShard1,  result.next().longValue());
+        assertEquals("Only single next shard returned", futureShard1,  result.next());
 
         assertTrue("Shards present", result.hasNext());
 
-        assertEquals("Previous shard present", 0l, result.next().longValue());
+        assertEquals("Previous shard present", 0l, result.next().getShardIndex());
 
         assertFalse("No shards left", result.hasNext());
 
@@ -422,11 +421,11 @@ public class NodeShardAllocationTest {
          */
         when( edgeShardSerialization
                 .getEdgeMetaData( same( scope ), same( nodeId ), any( Optional.class ),  same( type ),
-                        same( subType ) ) ).thenReturn( Collections.<Long>emptyList().iterator() );
+                        same( subType ) ) ).thenReturn( Collections.<Shard>emptyList().iterator() );
 
-        final Iterator<Long> result = approximation.getShards( scope, nodeId, Optional.<Long>absent(), type, subType );
+        final Iterator<Shard> result = approximation.getShards( scope, nodeId, Optional.<Shard>absent(), type, subType );
 
-        assertEquals("0 shard allocated", 0l, result.next().longValue());
+        assertEquals("0 shard allocated", 0l, result.next().getShardIndex());
 
         assertFalse( "No shard allocated", result.hasNext() );
     }

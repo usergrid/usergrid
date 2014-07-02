@@ -38,6 +38,7 @@ import org.apache.usergrid.persistence.core.astyanax.OrganizationScopedRowKeySer
 import org.apache.usergrid.persistence.core.astyanax.ColumnNameIterator;
 import org.apache.usergrid.persistence.core.astyanax.ColumnParser;
 import org.apache.usergrid.persistence.graph.serialization.impl.shard.EdgeShardSerialization;
+import org.apache.usergrid.persistence.graph.serialization.impl.shard.Shard;
 import org.apache.usergrid.persistence.model.entity.Id;
 
 import com.google.common.base.Optional;
@@ -65,7 +66,7 @@ public class EdgeShardSerializationImpl implements EdgeShardSerialization {
 
     private static final byte HOLDER = 0x00;
 
-    private static final LongColumnParser COLUMN_PARSER = new LongColumnParser();
+    private static final ShardColumnParser COLUMN_PARSER = new ShardColumnParser();
 
 
     protected final Keyspace keyspace;
@@ -105,7 +106,7 @@ public class EdgeShardSerializationImpl implements EdgeShardSerialization {
 
 
     @Override
-    public Iterator<Long> getEdgeMetaData( final ApplicationScope scope, final Id nodeId, final Optional<Long> start,
+    public Iterator<Shard> getEdgeMetaData( final ApplicationScope scope, final Id nodeId, final Optional<Shard> start,
                                            final String... types ) {
         /**
          * If the edge is present, we need to being seeking from this
@@ -114,7 +115,7 @@ public class EdgeShardSerializationImpl implements EdgeShardSerialization {
         final RangeBuilder rangeBuilder = new RangeBuilder().setLimit( graphFig.getScanPageSize() );
 
         if ( start.isPresent() ) {
-            rangeBuilder.setStart( start.get() );
+            rangeBuilder.setStart( start.get().getShardIndex() );
         }
 
         final EdgeRowKey key = new EdgeRowKey( nodeId, types );
@@ -163,11 +164,11 @@ public class EdgeShardSerializationImpl implements EdgeShardSerialization {
     }
 
 
-    private static class LongColumnParser implements ColumnParser<Long, Long> {
+    private static class ShardColumnParser implements ColumnParser<Long,Shard> {
 
         @Override
-        public Long parseColumn( final Column<Long> column ) {
-            return column.getName();
+        public Shard parseColumn( final Column<Long> column ) {
+            return new Shard(column.getName(), column.getTimestamp());
         }
     }
 }
