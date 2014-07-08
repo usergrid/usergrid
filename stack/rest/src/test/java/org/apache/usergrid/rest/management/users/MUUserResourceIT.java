@@ -27,6 +27,7 @@ import javax.mail.MessagingException;
 import javax.mail.internet.MimeMultipart;
 import javax.ws.rs.core.MediaType;
 
+import org.apache.usergrid.rest.exceptions.*;
 import org.codehaus.jackson.JsonNode;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -601,5 +602,36 @@ public class MUUserResourceIT extends AbstractRestIT {
         JsonNode adminNode = response.get( "data" ).get( 0 );
         assertEquals( context.getActiveUser().getEmail(), adminNode.get( "email" ).asText() );
         assertEquals( context.getActiveUser().getUser(), adminNode.get( "username" ).asText() );
+    }
+
+    @Test
+    public void testAdminGetUserByUsername() throws Exception {
+        UserInfo adminUser = setup.getMgmtSvc().createAdminUser("me", "test", "test@example.com", "test", true, false);
+        String tokenStr = mgmtToken( "test@example.com", "test" );
+
+        JsonNode node = resource().path( "/management/users/me" ).queryParam("access_token", tokenStr)
+                        .accept( MediaType.APPLICATION_JSON ).type( MediaType.APPLICATION_JSON_TYPE )
+                        .get(JsonNode.class);
+        assertNotNull(node);
+    }
+
+    @Test
+    public void testNonAdminGetUserByUsername() throws Exception {
+
+        createUser("me","abc@example.com","abc","abc");
+        String tokenStr = userToken( "abc@example.com", "abc" );
+
+        JsonNode node;
+        try {
+            node = resource().path("/management/users/me").queryParam("access_token", tokenStr)
+                             .accept(MediaType.APPLICATION_JSON).type(MediaType.APPLICATION_JSON_TYPE)
+                             .get(JsonNode.class);
+            fail("Exception was not raised for Non Admin Identity");
+        } catch (UniformInterfaceException e)
+        {
+            node = e.getResponse().getEntity( JsonNode.class );
+            assertEquals( "unauthorized", node.get( "error" ).getTextValue() );
+            assertEquals( "No admin identity for access credentials provided",node.get( "error_description" ).getTextValue() );
+        }
     }
 }

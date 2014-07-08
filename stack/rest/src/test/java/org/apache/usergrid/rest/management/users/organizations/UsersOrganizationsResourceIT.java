@@ -21,19 +21,25 @@ import java.util.Map;
 
 import javax.ws.rs.core.MediaType;
 
+import org.apache.usergrid.management.UserInfo;
 import org.codehaus.jackson.JsonNode;
 import org.junit.Test;
+import org.junit.Ignore;
 import org.apache.usergrid.cassandra.Concurrent;
 import org.apache.usergrid.rest.AbstractRestIT;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
+
 import static org.apache.usergrid.utils.MapUtils.hashMap;
 
 
 /** @author zznate */
 @Concurrent()
 public class UsersOrganizationsResourceIT extends AbstractRestIT {
+
+
 
 
     @Test
@@ -69,4 +75,21 @@ public class UsersOrganizationsResourceIT extends AbstractRestIT {
         catch ( Exception ex ) {
         }
     }
+
+    @Test
+    public void testAddUserToOrganizationByName() throws Exception {
+
+        UserInfo adminUser = setup.getMgmtSvc().createAdminUser("testuser", "testuser", "testuser@example.com", "testuser", true, false);
+
+        String username = adminUser.getUsername();
+
+
+        String path = String.format("management/orgs/test-organization/users/%s",username);
+        JsonNode node =
+                resource().path(path).queryParam("access_token",adminToken()).accept( MediaType.APPLICATION_JSON )
+                        .type(MediaType.APPLICATION_JSON_TYPE).put(JsonNode.class);
+
+        assertEquals( "add user to organization", node.get("action").asText());
+    }
+
 }
