@@ -17,32 +17,11 @@
 package org.apache.usergrid.rest.management.organizations.applications;
 
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Component;
-
+import com.google.common.base.Preconditions;
+import com.sun.jersey.api.json.JSONWithPadding;
 import org.apache.amber.oauth2.common.exception.OAuthSystemException;
 import org.apache.amber.oauth2.common.message.OAuthResponse;
 import org.apache.commons.lang.StringUtils;
-
 import org.apache.usergrid.management.ApplicationInfo;
 import org.apache.usergrid.management.OrganizationInfo;
 import org.apache.usergrid.management.export.ExportService;
@@ -55,13 +34,20 @@ import org.apache.usergrid.security.oauth.ClientCredentialsInfo;
 import org.apache.usergrid.security.providers.SignInAsProvider;
 import org.apache.usergrid.security.providers.SignInProviderFactory;
 import org.apache.usergrid.services.ServiceManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
-import com.google.common.base.Preconditions;
-import com.sun.jersey.api.json.JSONWithPadding;
+import javax.ws.rs.*;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
-import static javax.servlet.http.HttpServletResponse.SC_ACCEPTED;
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
-import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+import static javax.servlet.http.HttpServletResponse.*;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 
 
@@ -340,6 +326,38 @@ public class ApplicationResource extends AbstractContextResource {
                            .entity( ServiceResource.wrapWithCallback( errorMsg.getBody(), callback ) ).build();
         }
 
+        return Response.status( SC_ACCEPTED ).entity( uuidRet ).build();
+    }
+
+    @POST
+    @Path("import")
+    @Consumes(APPLICATION_JSON)
+    @RequireOrganizationAccess
+    public Response importPostJson( @Context UriInfo ui,Map<String, Object> json,
+                                    @QueryParam("callback") @DefaultValue("") String callback )
+            throws OAuthSystemException {
+
+
+        Map<String, String> uuidRet = new HashMap<String, String>();
+        UUID jobUUID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+
+        uuidRet.put( "Import Entity", jobUUID.toString() );
+
+        return Response.status( SC_ACCEPTED ).entity( uuidRet ).build();
+    }
+
+    @POST
+    @Path("collection/{collection_name}/import")
+    @Consumes(APPLICATION_JSON)
+    @RequireOrganizationAccess
+    public Response importPostJson( @Context UriInfo ui,@PathParam( "collection_name" ) String collection_name ,Map<String, Object> json,
+                                    @QueryParam("callback") @DefaultValue("") String callback )
+            throws OAuthSystemException {
+
+        Map<String, String> uuidRet = new HashMap<String, String>();
+        UUID jobUUID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+
+        uuidRet.put( "Import Entity", jobUUID.toString() );
         return Response.status( SC_ACCEPTED ).entity( uuidRet ).build();
     }
 }
