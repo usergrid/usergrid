@@ -25,6 +25,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.usergrid.management.ApplicationInfo;
 import org.apache.usergrid.management.OrganizationInfo;
 import org.apache.usergrid.management.export.ExportService;
+import org.apache.usergrid.management.importUG.ImportService;
 import org.apache.usergrid.rest.AbstractContextResource;
 import org.apache.usergrid.rest.ApiResponse;
 import org.apache.usergrid.rest.applications.ServiceResource;
@@ -61,6 +62,8 @@ public class ApplicationResource extends AbstractContextResource {
 
     @Autowired
     protected ExportService exportService;
+    protected ImportService importService;
+
     OrganizationInfo organization;
     UUID applicationId;
     ApplicationInfo application;
@@ -238,7 +241,7 @@ public class ApplicationResource extends AbstractContextResource {
                 throw new NullPointerException( "Could not find field 's3_key'" );
             }
 
-            json.put( "organizationId",organization.getUuid());
+            json.put("organizationId", organization.getUuid());
             //objEx.setOrganizationId( organization.getUuid() );
             json.put( "applicationId",applicationId);
             //objEx.setApplicationId( applicationId );
@@ -338,10 +341,59 @@ public class ApplicationResource extends AbstractContextResource {
             throws OAuthSystemException {
 
 
+        OAuthResponse response = null;
+        UUID jobUUID = null;
         Map<String, String> uuidRet = new HashMap<String, String>();
-        UUID jobUUID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-        uuidRet.put( "Import Entity", jobUUID.toString() );
+        Map<String,Object> properties;
+        Map<String, Object> storage_info;
+
+        try {
+            if((properties = ( Map<String, Object> )  json.get( "properties" )) == null){
+                throw new NullPointerException("Could not find 'properties'");
+            }
+            storage_info = ( Map<String, Object> ) properties.get( "storage_info" );
+            String storage_provider = ( String ) properties.get( "storage_provider" );
+            if(storage_provider == null) {
+                throw new NullPointerException( "Could not find field 'storage_provider'" );
+            }
+            if(storage_info == null) {
+                throw new NullPointerException( "Could not find field 'storage_info'" );
+            }
+
+
+            String bucketName = ( String ) storage_info.get( "bucket_location" );
+            String accessId = ( String ) storage_info.get( "s3_access_id" );
+            String secretKey = ( String ) storage_info.get( "s3_key" );
+
+            if(bucketName == null) {
+                throw new NullPointerException( "Could not find field 'bucketName'" );
+            }
+            if(accessId == null) {
+                throw new NullPointerException( "Could not find field 's3_access_id'" );
+            }
+            if(secretKey == null) {
+                throw new NullPointerException( "Could not find field 's3_key'" );
+            }
+
+            json.put( "organizationId",organization.getUuid());
+            //objEx.setOrganizationId( organization.getUuid() );
+            json.put( "applicationId",applicationId);
+            //objEx.setApplicationId( applicationId );
+
+            jobUUID = importService.schedule( json );
+            uuidRet.put( "Import Entity", jobUUID.toString() );
+        }
+        catch ( NullPointerException e ) {
+            return Response.status( SC_BAD_REQUEST ).type( JSONPUtils.jsonMediaType( callback ) )
+                    .entity( ServiceResource.wrapWithCallback( e.getMessage(), callback ) ).build();
+        }
+        catch ( Exception e ) {
+            //TODO:throw descriptive error message and or include on in the response
+            //TODO:fix below, it doesn't work if there is an exception. Make it look like the OauthResponse.
+            return Response.status( SC_INTERNAL_SERVER_ERROR ).type( JSONPUtils.jsonMediaType( callback ) )
+                    .entity( ServiceResource.wrapWithCallback( e.getMessage(), callback ) ).build();
+        }
 
         return Response.status( SC_ACCEPTED ).entity( uuidRet ).build();
     }
@@ -354,10 +406,63 @@ public class ApplicationResource extends AbstractContextResource {
                                     @QueryParam("callback") @DefaultValue("") String callback )
             throws OAuthSystemException {
 
+        OAuthResponse response = null;
+        UUID jobUUID = null;
+        String colImport = collection_name;
         Map<String, String> uuidRet = new HashMap<String, String>();
-        UUID jobUUID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-        uuidRet.put( "Import Entity", jobUUID.toString() );
+        Map<String,Object> properties;
+        Map<String, Object> storage_info;
+
+        try {
+            //checkJsonExportProperties(json);
+            if((properties = ( Map<String, Object> )  json.get( "properties" )) == null){
+                throw new NullPointerException("Could not find 'properties'");
+            }
+            storage_info = ( Map<String, Object> ) properties.get( "storage_info" );
+            String storage_provider = ( String ) properties.get( "storage_provider" );
+            if(storage_provider == null) {
+                throw new NullPointerException( "Could not find field 'storage_provider'" );
+            }
+            if(storage_info == null) {
+                throw new NullPointerException( "Could not find field 'storage_info'" );
+            }
+
+
+            String bucketName = ( String ) storage_info.get( "bucket_location" );
+            String accessId = ( String ) storage_info.get( "s3_access_id" );
+            String secretKey = ( String ) storage_info.get( "s3_key" );
+
+            if(bucketName == null) {
+                throw new NullPointerException( "Could not find field 'bucketName'" );
+            }
+            if(accessId == null) {
+                throw new NullPointerException( "Could not find field 's3_access_id'" );
+            }
+            if(secretKey == null) {
+                throw new NullPointerException( "Could not find field 's3_key'" );
+            }
+            json.put( "organizationId",organization.getUuid() );
+            json.put( "applicationId", applicationId);
+            json.put( "collectionName", colImport);
+
+            jobUUID = importService.schedule( json );
+            uuidRet.put( "Import Entity", jobUUID.toString() );
+        }
+        catch ( NullPointerException e ) {
+            return Response.status( SC_BAD_REQUEST ).type( JSONPUtils.jsonMediaType( callback ) )
+                    .entity( ServiceResource.wrapWithCallback( e.getMessage(), callback ) ).build();
+        }
+        catch ( Exception e ) {
+            //TODO:throw descriptive error message and or include on in the response
+            //TODO:fix below, it doesn't work if there is an exception. Make it look like the OauthResponse.
+            OAuthResponse errorMsg =
+                    OAuthResponse.errorResponse( SC_INTERNAL_SERVER_ERROR ).setErrorDescription( e.getMessage() )
+                            .buildJSONMessage();
+            return Response.status( errorMsg.getResponseStatus() ).type( JSONPUtils.jsonMediaType( callback ) )
+                    .entity( ServiceResource.wrapWithCallback( errorMsg.getBody(), callback ) ).build();
+        }
+
         return Response.status( SC_ACCEPTED ).entity( uuidRet ).build();
     }
 }
