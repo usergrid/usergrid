@@ -79,6 +79,7 @@ import org.apache.usergrid.persistence.exceptions.DuplicateUniquePropertyExistsE
 import org.apache.usergrid.persistence.exceptions.EntityNotFoundException;
 import org.apache.usergrid.persistence.exceptions.RequiredPropertyNotFoundException;
 import org.apache.usergrid.persistence.exceptions.UnexpectedEntityTypeException;
+import org.apache.usergrid.persistence.hector.CountingMutator;
 import org.apache.usergrid.persistence.schema.CollectionInfo;
 import org.apache.usergrid.utils.ClassUtils;
 import org.apache.usergrid.utils.CompositeUtils;
@@ -88,10 +89,6 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.yammer.metrics.annotation.Metered;
 
-import me.prettyprint.cassandra.serializers.ByteBufferSerializer;
-import me.prettyprint.cassandra.serializers.LongSerializer;
-import me.prettyprint.cassandra.serializers.StringSerializer;
-import me.prettyprint.cassandra.serializers.UUIDSerializer;
 import me.prettyprint.hector.api.Keyspace;
 import me.prettyprint.hector.api.beans.ColumnSlice;
 import me.prettyprint.hector.api.beans.CounterRow;
@@ -112,7 +109,7 @@ import static java.lang.String.CASE_INSENSITIVE_ORDER;
 import static java.util.Arrays.asList;
 
 import static me.prettyprint.hector.api.factory.HFactory.createCounterSliceQuery;
-import static me.prettyprint.hector.api.factory.HFactory.createMutator;
+
 import static org.apache.commons.lang.StringUtils.capitalize;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.usergrid.locking.LockHelper.getUniqueUpdateLock;
@@ -171,6 +168,7 @@ import static org.apache.usergrid.utils.UUIDUtils.getTimestampInMicros;
 import static org.apache.usergrid.utils.UUIDUtils.getTimestampInMillis;
 import static org.apache.usergrid.utils.UUIDUtils.isTimeBased;
 import static org.apache.usergrid.utils.UUIDUtils.newTimeUUID;
+import static org.apache.usergrid.persistence.cassandra.Serializers.*;
 
 
 /**
@@ -202,12 +200,6 @@ public class EntityManagerImpl implements EntityManager {
     private CounterUtils counterUtils;
 
     private boolean skipAggregateCounters;
-
-    public static final StringSerializer se = new StringSerializer();
-    public static final ByteBufferSerializer be = new ByteBufferSerializer();
-    public static final UUIDSerializer ue = new UUIDSerializer();
-    public static final LongSerializer le = new LongSerializer();
-
 
     public EntityManagerImpl() {
     }
@@ -725,7 +717,7 @@ public class EntityManagerImpl implements EntityManager {
         UUID timestampUuid = newTimeUUID();
 
         Keyspace ko = cass.getApplicationKeyspace( applicationId );
-        Mutator<ByteBuffer> m = createMutator( ko, be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( ko, be );
         A entity = batchCreate( m, entityType, entityClass, properties, importId, timestampUuid );
 
         batchExecute( m, CassandraService.RETRY_COUNT );
@@ -752,13 +744,16 @@ public class EntityManagerImpl implements EntityManager {
 
         long timestamp = getTimestampInMicros( timestampUuid );
 
-        UUID itemId = UUIDUtils.newTimeUUID();
+        UUID itemId = null;
 
         if ( is_application ) {
             itemId = applicationId;
         }
         if ( importId != null ) {
             itemId = importId;
+        }
+        if (itemId == null) {
+            itemId = UUIDUtils.newTimeUUID();
         }
         boolean emptyPropertyMap = false;
         if ( properties == null ) {
@@ -913,7 +908,7 @@ public class EntityManagerImpl implements EntityManager {
 
     private void incrementEntityCollection( String collection_name, long cassandraTimestamp ) {
         try {
-            incrementAggregateCounters( null, null, null, new String( APPLICATION_COLLECTION + collection_name ),
+            incrementAggregateCounters( null, null, null, APPLICATION_COLLECTION + collection_name,
                     ONE_COUNT, cassandraTimestamp );
         }
         catch ( Exception e ) {
@@ -956,7 +951,7 @@ public class EntityManagerImpl implements EntityManager {
     public void insertEntity( String type, UUID entityId ) throws Exception {
 
         Keyspace ko = cass.getApplicationKeyspace( applicationId );
-        Mutator<ByteBuffer> m = createMutator( ko, be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( ko, be );
 
         Object itemKey = key( entityId );
 
@@ -1028,9 +1023,7 @@ public class EntityManagerImpl implements EntityManager {
             column_names.add( PROPERTY_TYPE );
             column_names.add( PROPERTY_UUID );
 
-            for ( String propertyName : propertyNames ) {
-                column_names.add( propertyName );
-            }
+            Collections.addAll(column_names, propertyNames);
 
             results = cass.getColumns( cass.getApplicationKeyspace( applicationId ), ENTITY_PROPERTIES, key( entityId ),
                     column_names, se, be );
@@ -1386,7 +1379,7 @@ public class EntityManagerImpl implements EntityManager {
         }
 
         Keyspace ko = cass.getApplicationKeyspace( applicationId );
-        Mutator<ByteBuffer> m = createMutator( ko, be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( ko, be );
 
         UUID timestampUuid = newTimeUUID();
         properties.put( PROPERTY_MODIFIED, getTimestampInMillis( timestampUuid ) );
@@ -1410,7 +1403,7 @@ public class EntityManagerImpl implements EntityManager {
         logger.info( "deleteEntity: {} is of type {}", entityId, entity.getType() );
 
         Keyspace ko = cass.getApplicationKeyspace( applicationId );
-        Mutator<ByteBuffer> m = createMutator( ko, be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( ko, be );
 
         UUID timestampUuid = newTimeUUID();
         long timestamp = getTimestampInMicros( timestampUuid );
@@ -1725,7 +1718,7 @@ public class EntityManagerImpl implements EntityManager {
     public void createApplicationCollection( String entityType ) throws Exception {
 
         Keyspace ko = cass.getApplicationKeyspace( applicationId );
-        Mutator<ByteBuffer> m = createMutator( ko, be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( ko, be );
 
         long timestamp = cass.createTimestamp();
 
@@ -1752,6 +1745,9 @@ public class EntityManagerImpl implements EntityManager {
 
     public EntityRef validate( EntityRef entityRef, boolean verify ) throws Exception {
         if ( ( entityRef == null ) || ( entityRef.getUuid() == null ) ) {
+            if(verify){
+                throw new EntityNotFoundException( "An unknown entity cannot be verified" );
+            }
             return null;
         }
         if ( ( entityRef.getType() == null ) || verify ) {
@@ -2017,7 +2013,8 @@ public class EntityManagerImpl implements EntityManager {
         DynamicEntity entity = loadPartialEntity( entityRef.getUuid(), propertyName );
 
         UUID timestampUuid = newTimeUUID();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         propertyValue = getDefaultSchema().validateEntityPropertyValue( entity.getType(), propertyName, propertyValue );
 
@@ -2052,7 +2049,8 @@ public class EntityManagerImpl implements EntityManager {
         EntityRef entity = getRef( entityRef.getUuid() );
 
         UUID timestampUuid = newTimeUUID();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         batch = batchUpdateDictionary( batch, entity, dictionaryName, elementValue, elementCoValue, false,
                 timestampUuid );
@@ -2072,7 +2070,8 @@ public class EntityManagerImpl implements EntityManager {
         EntityRef entity = getRef( entityRef.getUuid() );
 
         UUID timestampUuid = newTimeUUID();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         for ( Object elementValue : elementValues ) {
             batch = batchUpdateDictionary( batch, entity, dictionaryName, elementValue, null, false, timestampUuid );
@@ -2093,7 +2092,8 @@ public class EntityManagerImpl implements EntityManager {
         EntityRef entity = getRef( entityRef.getUuid() );
 
         UUID timestampUuid = newTimeUUID();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         for ( Map.Entry<?, ?> elementValue : elementValues.entrySet() ) {
             batch = batchUpdateDictionary( batch, entity, dictionaryName, elementValue.getKey(),
@@ -2115,7 +2115,8 @@ public class EntityManagerImpl implements EntityManager {
         EntityRef entity = getRef( entityRef.getUuid() );
 
         UUID timestampUuid = newTimeUUID();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         batch = batchUpdateDictionary( batch, entity, dictionaryName, elementValue, true, timestampUuid );
 
@@ -2256,14 +2257,14 @@ public class EntityManagerImpl implements EntityManager {
 
         if ( roleNames != null ) {
             nameResults = getDictionaryElementValues( getApplicationRef(), DICTIONARY_ROLENAMES,
-                    roleNames.toArray( new String[0] ) );
+                    roleNames.toArray(new String[roleNames.size()]));
         }
         else {
             nameResults = cast( getDictionaryAsMap( getApplicationRef(), DICTIONARY_ROLENAMES ) );
             roleNames = nameResults.keySet();
         }
         Map<String, Object> timeResults = getDictionaryElementValues( getApplicationRef(), DICTIONARY_ROLETIMES,
-                roleNames.toArray( new String[0] ) );
+                roleNames.toArray(new String[roleNames.size()]));
 
         for ( String roleName : roleNames ) {
 
@@ -2289,7 +2290,8 @@ public class EntityManagerImpl implements EntityManager {
     @Override
     public Entity createRole( String roleName, String roleTitle, long inactivity ) throws Exception {
         UUID timestampUuid = newTimeUUID();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
         batchCreateRole( batch, null, roleName, roleTitle, inactivity, null, timestampUuid );
         batchExecute( batch, CassandraService.RETRY_COUNT );
         return get( roleRef( roleName ) );
@@ -2301,7 +2303,8 @@ public class EntityManagerImpl implements EntityManager {
         roleName = roleName.toLowerCase();
         permission = permission.toLowerCase();
         long timestamp = cass.createTimestamp();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
         addInsertToMutator( batch, ApplicationCF.ENTITY_DICTIONARIES, getRolePermissionsKey( roleName ), permission,
                 ByteBuffer.allocate( 0 ), timestamp );
         batchExecute( batch, CassandraService.RETRY_COUNT );
@@ -2312,7 +2315,8 @@ public class EntityManagerImpl implements EntityManager {
     public void grantRolePermissions( String roleName, Collection<String> permissions ) throws Exception {
         roleName = roleName.toLowerCase();
         long timestamp = cass.createTimestamp();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
         for ( String permission : permissions ) {
             permission = permission.toLowerCase();
             addInsertToMutator( batch, ApplicationCF.ENTITY_DICTIONARIES, getRolePermissionsKey( roleName ), permission,
@@ -2327,7 +2331,8 @@ public class EntityManagerImpl implements EntityManager {
         roleName = roleName.toLowerCase();
         permission = permission.toLowerCase();
         long timestamp = cass.createTimestamp();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
         CassandraPersistenceUtils
                 .addDeleteToMutator( batch, ApplicationCF.ENTITY_DICTIONARIES, getRolePermissionsKey( roleName ),
                         permission, timestamp );
@@ -2366,7 +2371,8 @@ public class EntityManagerImpl implements EntityManager {
     @Override
     public Entity createGroupRole( UUID groupId, String roleName, long inactivity ) throws Exception {
         UUID timestampUuid = newTimeUUID();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
         batchCreateRole( batch, groupId, roleName, null, inactivity, null, timestampUuid );
         batchExecute( batch, CassandraService.RETRY_COUNT );
         return get( roleRef( groupId, roleName ) );
@@ -2378,7 +2384,8 @@ public class EntityManagerImpl implements EntityManager {
         roleName = roleName.toLowerCase();
         permission = permission.toLowerCase();
         long timestamp = cass.createTimestamp();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
         addInsertToMutator( batch, ApplicationCF.ENTITY_DICTIONARIES, getRolePermissionsKey( groupId, roleName ),
                 permission, ByteBuffer.allocate( 0 ), timestamp );
         batchExecute( batch, CassandraService.RETRY_COUNT );
@@ -2390,7 +2397,8 @@ public class EntityManagerImpl implements EntityManager {
         roleName = roleName.toLowerCase();
         permission = permission.toLowerCase();
         long timestamp = cass.createTimestamp();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
         CassandraPersistenceUtils.addDeleteToMutator( batch, ApplicationCF.ENTITY_DICTIONARIES,
                 getRolePermissionsKey( groupId, roleName ), permission, timestamp );
         batchExecute( batch, CassandraService.RETRY_COUNT );
@@ -2516,7 +2524,8 @@ public class EntityManagerImpl implements EntityManager {
                                              long cassandraTimestamp ) {
         // TODO short circuit
         if ( !skipAggregateCounters ) {
-            Mutator<ByteBuffer> m = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+            Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                    be );
 
             counterUtils
                     .batchIncrementAggregateCounters( m, applicationId, userId, groupId, null, category, counterName,
@@ -2532,7 +2541,8 @@ public class EntityManagerImpl implements EntityManager {
         // TODO shortcircuit
         if ( !skipAggregateCounters ) {
             long timestamp = cass.createTimestamp();
-            Mutator<ByteBuffer> m = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+            Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                    be );
             counterUtils.batchIncrementAggregateCounters( m, applicationId, userId, groupId, null, category, counters,
                     timestamp );
 

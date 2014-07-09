@@ -26,6 +26,7 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.apache.usergrid.persistence.EntityManager;
 import org.apache.usergrid.persistence.Identifier;
 import org.apache.usergrid.persistence.Query;
@@ -95,7 +96,7 @@ public class QueryProcessor {
 
     private int size;
     private Query query;
-    private int pageSizeHint;
+    private int sliceCount;
 
 
     public QueryProcessor( Query query, CollectionInfo collectionInfo, EntityManager em,
@@ -130,7 +131,8 @@ public class QueryProcessor {
 
     private void process() throws PersistenceException {
 
-        int opCount = 0;
+
+        sliceCount = 0;
 
         // no operand. Check for sorts
         if ( rootOperand != null ) {
@@ -142,16 +144,16 @@ public class QueryProcessor {
 
             rootNode = visitor.getRootNode();
 
-            opCount = visitor.getSliceCount();
+            sliceCount = rootNode.getCount();
         }
 
         // see if we have sorts, if so, we can add them all as a single node at
         // the root
         if ( sorts.size() > 0 ) {
 
-            OrderByNode order = generateSorts( opCount );
+            OrderByNode order = generateSorts( sliceCount );
 
-            opCount += order.getFirstPredicate().getAllSlices().size();
+            sliceCount += order.getCount();
 
             rootNode = order;
         }
@@ -203,13 +205,6 @@ public class QueryProcessor {
                 rootNode = allNode;
             }
         }
-
-        if ( opCount > 1 ) {
-            pageSizeHint = PAGE_SIZE;
-        }
-        else {
-            pageSizeHint = Math.min( size, PAGE_SIZE );
-        }
     }
 
 
@@ -245,10 +240,8 @@ public class QueryProcessor {
 
     /**
      * Return the node id from the cursor cache
-     * @param nodeId
-     * @return
      */
-    public ByteBuffer getCursorCache(int nodeId){
+    public ByteBuffer getCursorCache( int nodeId ) {
         return cursorCache.getCursorBytes( nodeId );
     }
 
@@ -263,7 +256,9 @@ public class QueryProcessor {
     }
 
 
-    /** Return the iterator results, ordered if required */
+    /**
+     * Return the iterator results, ordered if required
+     */
     public Results getResults( SearchVisitor visitor ) throws Exception {
         // if we have no order by just load the results
 
@@ -292,8 +287,9 @@ public class QueryProcessor {
                 itr.finalizeCursor( resultsCursor, entityIds.get( resultSize - 1 ).getUUID() );
             }
         }
-        if (logger.isDebugEnabled()) {
-        	logger.debug("Getting result for query: [{}],  returning entityIds size: {}", getQuery(), entityIds.size());
+        if ( logger.isDebugEnabled() ) {
+            logger.debug( "Getting result for query: [{}],  returning entityIds size: {}", getQuery(),
+                    entityIds.size() );
         }
 
         final ResultsLoader loader = loaderFactory.getResultsLoader( em, query, query.getResultsLevel() );
@@ -318,13 +314,15 @@ public class QueryProcessor {
 
         // stack for nodes that will be used to construct the tree and create
         // objects
-        private CountingStack<QueryNode> nodes = new CountingStack<QueryNode>();
+        private Stack<QueryNode> nodes = new Stack<QueryNode>();
 
 
         private int contextCount = -1;
 
 
-        /** Get the root node in our tree for runtime evaluation */
+        /**
+         * Get the root node in our tree for runtime evaluation
+         */
         public QueryNode getRootNode() {
             return nodes.peek();
         }
@@ -395,7 +393,7 @@ public class QueryProcessor {
             QueryNode leftResult = nodes.pop();
 
             // rewrite with the new Or operand
-            OrNode orNode = new OrNode( leftResult, rightResult,  ++contextCount );
+            OrNode orNode = new OrNode( leftResult, rightResult, ++contextCount );
 
             nodes.push( orNode );
         }
@@ -516,7 +514,7 @@ public class QueryProcessor {
         public void visit( Equal op ) throws NoIndexException {
             String fieldName = op.getProperty().getValue();
 
-            checkIndexed( fieldName );
+            //checkIndexed( fieldName );
 
             Literal<?> literal = op.getLiteral();
             SliceNode node = getUnionNode( op );
@@ -597,7 +595,9 @@ public class QueryProcessor {
         }
 
 
-        /** The new slice node */
+        /**
+         * The new slice node
+         */
         private SliceNode newSliceNode() {
             SliceNode sliceNode = new SliceNode( ++contextCount );
 
@@ -607,80 +607,43 @@ public class QueryProcessor {
         }
 
 
-        /** Create a new slice if one will be required within the context of this node */
+        /**
+         * Create a new slice if one will be required within the context of this node
+         */
         private void createNewSlice( Operand child ) {
             if ( child instanceof EqualityOperand || child instanceof AndOperand || child instanceof ContainsOperand ) {
                 newSliceNode();
             }
         }
 
-
-        public int getSliceCount() {
-            return nodes.getSliceCount();
-        }
     }
 
 
-    private static class CountingStack<T> extends Stack<T> {
-
-        private int count = 0;
-
-        /**
-         *
-         */
-        private static final long serialVersionUID = 1L;
 
 
-        /* (non-Javadoc)
-         * @see java.util.Stack#pop()
-         */
-        @Override
-        public synchronized T pop() {
-            T entry = super.pop();
-
-            if ( entry instanceof SliceNode ) {
-                count += ( ( SliceNode ) entry ).getAllSlices().size();
-            }
-
-            return entry;
-        }
-
-
-        public int getSliceCount() {
-
-            Iterator<T> itr = this.iterator();
-
-            T entry;
-
-            while ( itr.hasNext() ) {
-                entry = itr.next();
-
-                if ( entry instanceof SliceNode ) {
-                    count += ( ( SliceNode ) entry ).getAllSlices().size();
-                }
-            }
-
-            return count;
-        }
-    }
-
-
-    /** @return the pageSizeHint */
+    /**
+     * @return the pageSizeHint
+     */
     public int getPageSizeHint( QueryNode node ) {
         /*****
          * DO NOT REMOVE THIS PIECE OF CODE!!!!!!!!!!!
          * It is crucial that the root iterator only needs the result set size per page
          * otherwise our cursor logic will fail when passing cursor data to the leaf nodes
          *******/
-        if(node == rootNode){
+
+        //if it's a root node, and there's only 1 slice to check in the entire tree, then just select what we need
+        //so we short circuit on range scans faster.  otherwise it's more efficient to make less trips with candidates we discard from cassandra
+        if ( node == rootNode && sliceCount == 1 ) {
             return size;
         }
 
-        return pageSizeHint;
+        return PAGE_SIZE;
     }
 
 
-    /** Generate a slice node with scan ranges for all the properties in our sort cache */
+    /**
+     * Generate a slice node with scan ranges for all the properties in our sort cache
+     */
     private OrderByNode generateSorts( int opCount ) throws NoIndexException {
 
         // the value is irrelevant since we'll only ever have 1 slice node

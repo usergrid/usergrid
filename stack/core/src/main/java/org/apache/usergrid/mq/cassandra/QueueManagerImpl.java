@@ -61,16 +61,11 @@ import org.apache.usergrid.persistence.cassandra.CassandraService;
 import org.apache.usergrid.persistence.cassandra.CounterUtils;
 import org.apache.usergrid.persistence.cassandra.CounterUtils.AggregateCounterSelection;
 import org.apache.usergrid.persistence.exceptions.TransactionNotFoundException;
+import org.apache.usergrid.persistence.hector.CountingMutator;
 import org.apache.usergrid.utils.UUIDUtils;
 
 import com.fasterxml.uuid.UUIDComparator;
 
-import me.prettyprint.cassandra.serializers.ByteBufferSerializer;
-import me.prettyprint.cassandra.serializers.BytesArraySerializer;
-import me.prettyprint.cassandra.serializers.DynamicCompositeSerializer;
-import me.prettyprint.cassandra.serializers.LongSerializer;
-import me.prettyprint.cassandra.serializers.StringSerializer;
-import me.prettyprint.cassandra.serializers.UUIDSerializer;
 import me.prettyprint.hector.api.Keyspace;
 import me.prettyprint.hector.api.beans.AbstractComposite.ComponentEquality;
 import me.prettyprint.hector.api.beans.ColumnSlice;
@@ -89,7 +84,7 @@ import me.prettyprint.hector.api.query.SliceQuery;
 
 import static me.prettyprint.hector.api.factory.HFactory.createColumn;
 import static me.prettyprint.hector.api.factory.HFactory.createCounterSliceQuery;
-import static me.prettyprint.hector.api.factory.HFactory.createMutator;
+
 import static me.prettyprint.hector.api.factory.HFactory.createSliceQuery;
 import static org.apache.usergrid.mq.Queue.QUEUE_CREATED;
 import static org.apache.usergrid.mq.Queue.QUEUE_MODIFIED;
@@ -132,6 +127,7 @@ import static org.apache.usergrid.utils.MapUtils.emptyMapWithKeys;
 import static org.apache.usergrid.utils.NumberUtils.roundLong;
 import static org.apache.usergrid.utils.UUIDUtils.getTimestampInMicros;
 import static org.apache.usergrid.utils.UUIDUtils.newTimeUUID;
+import static org.apache.usergrid.persistence.cassandra.Serializers.*;
 
 
 public class QueueManagerImpl implements QueueManager {
@@ -153,12 +149,6 @@ public class QueueManagerImpl implements QueueManager {
     private LockManager lockManager;
     private int lockTimeout;
 
-    public static final StringSerializer se = new StringSerializer();
-    public static final ByteBufferSerializer be = new ByteBufferSerializer();
-    public static final UUIDSerializer ue = new UUIDSerializer();
-    public static final BytesArraySerializer bae = new BytesArraySerializer();
-    public static final DynamicCompositeSerializer dce = new DynamicCompositeSerializer();
-    public static final LongSerializer le = new LongSerializer();
 
 
     public QueueManagerImpl() {
@@ -240,7 +230,8 @@ public class QueueManagerImpl implements QueueManager {
     @Override
     public Message postToQueue( String queuePath, Message message ) {
         long timestamp = cass.createTimestamp();
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         queuePath = normalizeQueuePath( queuePath );
 
@@ -259,7 +250,7 @@ public class QueueManagerImpl implements QueueManager {
                 break;
             }
 
-            batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+            batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ), be );
             for ( QueueInfo q : subscribers.getQueues() ) {
                 batchPostToQueue( batch, q.getPath(), message, indexUpdate, timestamp );
 
@@ -439,7 +430,8 @@ public class QueueManagerImpl implements QueueManager {
         UUID timestampUuid = newTimeUUID();
         long timestamp = getTimestampInMicros( timestampUuid );
 
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         batchSubscribeToQueue( batch, publisherQueuePath, publisherQueueId, subscriberQueuePath, subscriberQueueId,
                 timestamp );
@@ -484,7 +476,8 @@ public class QueueManagerImpl implements QueueManager {
         UUID timestampUuid = newTimeUUID();
         long timestamp = getTimestampInMicros( timestampUuid );
 
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         batchUnsubscribeFromQueue( batch, publisherQueuePath, publisherQueueId, subscriberQueuePath, subscriberQueueId,
                 timestamp );
@@ -578,7 +571,8 @@ public class QueueManagerImpl implements QueueManager {
         UUID timestampUuid = newTimeUUID();
         long timestamp = getTimestampInMicros( timestampUuid );
 
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         QueueSet queues = new QueueSet();
 
@@ -618,7 +612,8 @@ public class QueueManagerImpl implements QueueManager {
         UUID timestampUuid = newTimeUUID();
         long timestamp = getTimestampInMicros( timestampUuid );
 
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         QueueSet queues = new QueueSet();
 
@@ -658,7 +653,8 @@ public class QueueManagerImpl implements QueueManager {
         UUID timestampUuid = newTimeUUID();
         long timestamp = getTimestampInMicros( timestampUuid );
 
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         QueueSet queues = new QueueSet();
 
@@ -698,7 +694,8 @@ public class QueueManagerImpl implements QueueManager {
         UUID timestampUuid = newTimeUUID();
         long timestamp = getTimestampInMicros( timestampUuid );
 
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         QueueSet queues = new QueueSet();
 
@@ -732,7 +729,8 @@ public class QueueManagerImpl implements QueueManager {
     @Override
     public void incrementAggregateQueueCounters( String queuePath, String category, String counterName, long value ) {
         long timestamp = cass.createTimestamp();
-        Mutator<ByteBuffer> m = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
         counterUtils.batchIncrementAggregateCounters( m, applicationId, null, null, getQueueId( queuePath ), category,
                 counterName, value, timestamp );
         batchExecute( m, CassandraService.RETRY_COUNT );
@@ -875,7 +873,8 @@ public class QueueManagerImpl implements QueueManager {
     @Override
     public void incrementQueueCounters( String queuePath, Map<String, Long> counts ) {
         long timestamp = cass.createTimestamp();
-        Mutator<ByteBuffer> m = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
         counterUtils.batchIncrementQueueCounters( m, getQueueId( queuePath ), counts, timestamp, applicationId );
         batchExecute( m, CassandraService.RETRY_COUNT );
     }
@@ -884,7 +883,8 @@ public class QueueManagerImpl implements QueueManager {
     @Override
     public void incrementQueueCounter( String queuePath, String name, long value ) {
         long timestamp = cass.createTimestamp();
-        Mutator<ByteBuffer> m = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
         counterUtils.batchIncrementQueueCounter( m, getQueueId( queuePath ), name, value, timestamp, applicationId );
         batchExecute( m, CassandraService.RETRY_COUNT );
     }
@@ -954,7 +954,8 @@ public class QueueManagerImpl implements QueueManager {
         UUID timestampUuid = newTimeUUID();
         long timestamp = getTimestampInMicros( timestampUuid );
 
-        Mutator<ByteBuffer> batch = createMutator( cass.getApplicationKeyspace( applicationId ), be );
+        Mutator<ByteBuffer> batch = CountingMutator.createFlushingMutator( cass.getApplicationKeyspace( applicationId ),
+                be );
 
         addQueueToMutator( batch, queue, timestamp );
 

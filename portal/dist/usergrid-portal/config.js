@@ -12,12 +12,39 @@ Usergrid.options = {
    // apiKey:'123456'
   },
   showAutoRefresh:true,
-  autoUpdateTimer:61//seconds
+  autoUpdateTimer:61, //seconds
+  menuItems:[
+    {path:'#!/org-overview', active:true,pic:'&#128362;',title:'Org Administration'},
+    {path:'#!/getting-started/setup',pic:'&#128640;',title:'Getting Started'},
+    {path:'#!/app-overview/summary',pic:'&#59214;',title:'App Overview',
+      items:[
+        {path:'#!/app-overview/summary',pic:'&#128241;',title:'Summary'}
+      ]
+    },
+    {
+      path:'#!/users',pic:'&#128100;',title:'Users',
+      items:[
+        {path:'#!/users',pic:'&#128100;',title:'Users'},
+        {path:'#!/groups',pic:'&#128101;',title:'Groups'},
+        {path:'#!/roles',pic:'&#59170;',title:'Roles'}
+      ]
+    },
+    {
+      path:'#!/data',pic:'&#128248;',title:'Data',
+      items:[
+        {path:'#!/data',pic:'&#128254;',title:'Collections'}
+      ]
+    },
+    {
+      path:'#!/activities',pic:'&#59194;',title:'Activities'
+    },
+    {path:'#!/shell',pic:'&#9000;',title:'Shell'}
+  ]
 };
 
 Usergrid.regex = {
   appNameRegex: new RegExp("^[0-9a-zA-Z.-]{3,25}$"),
-  usernameRegex: new RegExp("^[0-9a-zA-Z\.\_-]{4,25}$"),
+  usernameRegex: new RegExp("^[0-9a-zA-Z@\.\_-]{4,25}$"),
   nameRegex: new RegExp("^([0-9a-zA-Z@#$%^&!?;:.,'\"~*-:+_\[\\](){}/\\ |]{3,60})+$"),
   roleNameRegex: new RegExp("^([0-9a-zA-Z./-]{3,25})+$"),
   emailRegex: new RegExp("^(([0-9a-zA-Z]+[_\+.-]?)+@[0-9a-zA-Z]+[0-9,a-z,A-Z,.,-]*(.){1}[a-zA-Z]{2,4})+$"),

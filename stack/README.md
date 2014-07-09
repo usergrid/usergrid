@@ -1,4 +1,5 @@
 # Usergrid
+
 A highly-scalable data platform for mobile applications.
 
 * **Documentation**: http://apigee.com/docs/usergrid/
@@ -38,8 +39,7 @@ If you built and used a previous version of Usergrid, that may be using a differ
 
 ## Getting Started with the Admin Portal
 
-By default, the [Usergrid admin portal](https://github.com/apigee/usergrid-portal) points to our production servers at `api.usergrid.com`. However, by specifying an api_url argument in the query string, you can have it point to
-your local instance instead. For example, you could reuse the version of the admin portal we host on github and have that point to your local cluster by opening the following URL in your browser:
+By default, the [Usergrid admin portal](https://github.com/apigee/usergrid-portal) points to (Apigee provided) production servers at `api.usergrid.com`. However, by specifying an api_url argument in the query string, you can have it point to your local instance instead. For example, you could reuse the version of the admin portal we host on github and have that point to your local cluster by opening the following URL in your browser:
 [http://apigee.github.com/usergrid-portal/?api_url=http://localhost:8080](http://apigee.github.com/usergrid-portal/?api_url=http://localhost:8080)
 
 The same trick would work if you used a local copy of the portal code served from your own machine or servers.
@@ -84,7 +84,7 @@ Let’s use it to create a collection with some data in it:
 
 ## Contributing
 
-We welcome all contributions, including via pull requests on GitHub! If you want to submit code, please read more about our [contribution workflow](https://cwiki.apache.org/confluence/display/usergrid/GitHub+Based+Contribution+Workflow)
+We welcome all contributions, including via pull requests on GitHub! If you want to submit code, please read more about our [contribution workflow](https://cwiki.apache.org/confluence/display/usergrid/Usergrid+Contribution+Workflow)
 
 ## Licenses
 

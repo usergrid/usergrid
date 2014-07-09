@@ -39,6 +39,7 @@ import org.apache.usergrid.persistence.IndexBucketLocator;
 import org.apache.usergrid.persistence.IndexBucketLocator.IndexType;
 import org.apache.usergrid.persistence.cassandra.index.IndexBucketScanner;
 import org.apache.usergrid.persistence.cassandra.index.IndexScanner;
+import org.apache.usergrid.persistence.hector.CountingMutator;
 
 import me.prettyprint.cassandra.connection.HConnectionManager;
 import me.prettyprint.cassandra.model.ConfigurableConsistencyLevel;
@@ -75,7 +76,7 @@ import me.prettyprint.hector.api.query.SliceQuery;
 import static me.prettyprint.cassandra.service.FailoverPolicy.ON_FAIL_TRY_ALL_AVAILABLE;
 import static me.prettyprint.hector.api.factory.HFactory.createColumn;
 import static me.prettyprint.hector.api.factory.HFactory.createMultigetSliceQuery;
-import static me.prettyprint.hector.api.factory.HFactory.createMutator;
+
 import static me.prettyprint.hector.api.factory.HFactory.createRangeSlicesQuery;
 import static me.prettyprint.hector.api.factory.HFactory.createSliceQuery;
 import static me.prettyprint.hector.api.factory.HFactory.createVirtualKeyspace;
@@ -166,6 +167,12 @@ public class CassandraService {
         systemKeyspace =
                 HFactory.createKeyspace( SYSTEM_KEYSPACE, cluster, consistencyLevelPolicy, ON_FAIL_TRY_ALL_AVAILABLE,
                         accessMap );
+
+
+        final int flushSize = getIntValue( properties, "cassandra.mutation.flushsize", 2000 );
+        CountingMutator.MAX_SIZE = flushSize;
+
+
     }
 
 
@@ -817,7 +824,7 @@ public class CassandraService {
         if ( ttl != 0 ) {
             col.setTtl( ttl );
         }
-        Mutator<ByteBuffer> m = createMutator( ko, be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( ko, be );
         m.insert( bytebuffer( key ), columnFamily.toString(), col );
     }
 
@@ -844,7 +851,7 @@ public class CassandraService {
                                                                                                  " ttl=" + ttl : "" ) );
         }
 
-        Mutator<ByteBuffer> m = createMutator( ko, be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( ko, be );
         long timestamp = createTimestamp();
 
         for ( Object name : map.keySet() ) {
@@ -905,7 +912,7 @@ public class CassandraService {
             db_logger.debug( "deleteColumn cf=" + columnFamily + " key=" + key + " name=" + column );
         }
 
-        Mutator<ByteBuffer> m = createMutator( ko, be );
+        Mutator<ByteBuffer> m = CountingMutator.createFlushingMutator( ko, be );
         m.delete( bytebuffer( key ), columnFamily.toString(), bytebuffer( column ), be );
     }
 
@@ -995,39 +1002,9 @@ public class CassandraService {
             db_logger.debug( "deleteRow cf=" + columnFamily + " key=" + key );
         }
 
-        createMutator( ko, be ).addDeletion( bytebuffer( key ), columnFamily.toString() ).execute();
+        CountingMutator.createFlushingMutator( ko, be ).addDeletion( bytebuffer( key ), columnFamily.toString() ).execute();
     }
 
-
-    public void deleteRow( Keyspace ko, final Object columnFamily, final String key ) throws Exception {
-
-        if ( db_logger.isDebugEnabled() ) {
-            db_logger.debug( "deleteRow cf=" + columnFamily + " key=" + key );
-        }
-
-        createMutator( ko, se ).addDeletion( key, columnFamily.toString() ).execute();
-    }
-
-
-    /**
-     * Delete row.
-     *
-     * @param keyspace the keyspace
-     * @param columnFamily the column family
-     * @param key the key
-     * @param timestamp the timestamp
-     *
-     * @throws Exception the exception
-     */
-    public void deleteRow( Keyspace ko, final Object columnFamily, final Object key, final long timestamp )
-            throws Exception {
-
-        if ( db_logger.isDebugEnabled() ) {
-            db_logger.debug( "deleteRow cf=" + columnFamily + " key=" + key + " timestamp=" + timestamp );
-        }
-
-        createMutator( ko, be ).addDeletion( bytebuffer( key ), columnFamily.toString(), timestamp ).execute();
-    }
 
 
     /**
@@ -1070,62 +1047,7 @@ public class CassandraService {
     }
 
 
-    public int countColumns( Keyspace ko, Object columnFamily, Object key ) throws Exception {
 
-
-        CountQuery<ByteBuffer, ByteBuffer> cq = HFactory.createCountQuery( ko, be, be );
-        cq.setColumnFamily( columnFamily.toString() );
-        cq.setKey( bytebuffer( key ) );
-        cq.setRange( ByteBuffer.allocate( 0 ), ByteBuffer.allocate( 0 ), 100000000 );
-        QueryResult<Integer> r = cq.execute();
-        if ( r == null ) {
-            return 0;
-        }
-        return r.get();
-    }
-
-
-    /**
-     * Sets the id list.
-     *
-     * @param keyspace the keyspace
-     * @param targetId the target id
-     * @param columnFamily the column family
-     * @param keyPrefix the key prefix
-     * @param keySuffix the key suffix
-     * @param keyIds the key ids
-     * @param setColumnValue the set column value
-     *
-     * @throws Exception the exception
-     */
-    public void setIdList( Keyspace ko, UUID targetId, String keyPrefix, String keySuffix, List<UUID> keyIds )
-            throws Exception {
-        long timestamp = createTimestamp();
-        Mutator<ByteBuffer> batch = createMutator( ko, be );
-        batch = buildSetIdListMutator( batch, targetId, ENTITY_ID_SETS.toString(), keyPrefix, keySuffix, keyIds,
-                timestamp );
-        batchExecute( batch, CassandraService.RETRY_COUNT );
-    }
-
-
-    boolean clusterUp = false;
-
-
-    public void startClusterHealthCheck() {
-
-        ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-        executorService.scheduleWithFixedDelay( new Runnable() {
-            @Override
-            public void run() {
-                if ( cluster != null ) {
-                    HConnectionManager connectionManager = cluster.getConnectionManager();
-                    if ( connectionManager != null ) {
-                        clusterUp = !connectionManager.getHosts().isEmpty();
-                    }
-                }
-            }
-        }, 1, 5, TimeUnit.SECONDS );
-    }
     
     public void destroy() throws Exception {
     	if (cluster != null) {
