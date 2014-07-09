@@ -3,11 +3,9 @@ Apache Usergrid
 
 **Apache Usergrid is a multi-tenant Backend-as-a-Service stack for web & mobile applications, based on RESTful APIs. It is [currently incubating at the Apache Software Foundation](http://usergrid.incubator.apache.org/).**
 
-##Canonical Source
-The canonical source for Apache Usergrid is Apache's git-wip, however...  
-
 ##Contributing
-We accept all contributions via our [working repository](http://github.com/usergrid/usergrid), located at [http://github.com/usergrid/usergrid](http://github.com/usergrid/usergrid) 
+You can contribute by forking the Apache Usergrid repo and then submitting a Pull Request, for more information see our 
+[Contribution Workflow](https://cwiki.apache.org/confluence/display/usergrid/Usergrid+Contribution+Workflow) document.
 
 ##Build awesome apps with Usergrid!
 
@@ -25,4 +23,3 @@ Look for much more detailed README files in their corresponding subdirectories, 
 
 ##For more information
 See the [Apache Usergrid web site](http://usergrid.incubator.apache.org/).
-
