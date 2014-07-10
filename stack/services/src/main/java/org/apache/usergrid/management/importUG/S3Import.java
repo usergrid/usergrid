@@ -26,4 +26,5 @@ public interface S3Import {
     File copyFromS3(Map<String,Object> exportInfo, String filename );
 
     String getFilename ();
+
 }

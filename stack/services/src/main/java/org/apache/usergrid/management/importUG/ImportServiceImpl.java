@@ -19,9 +19,8 @@ package org.apache.usergrid.management.importUG;
 import org.apache.usergrid.batch.JobExecution;
 import org.apache.usergrid.batch.service.SchedulerService;
 import org.apache.usergrid.management.ApplicationInfo;
-import org.apache.usergrid.management.ManagementService;
-
 import org.apache.usergrid.management.OrganizationInfo;
+import org.apache.usergrid.management.ManagementService;
 import org.apache.usergrid.persistence.EntityManager;
 import org.apache.usergrid.persistence.EntityManagerFactory;
 import org.apache.usergrid.persistence.entities.Import;
@@ -30,10 +29,10 @@ import org.codehaus.jackson.JsonFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.io.File;
 
 import static org.apache.usergrid.persistence.cassandra.CassandraService.MANAGEMENT_APPLICATION_ID;
 
@@ -65,21 +64,20 @@ public class ImportServiceImpl implements ImportService {
 
         ApplicationInfo defaultImportApp = null;
 
-        if ( config == null ) {
-            logger.error( "import information cannot be null" );
+        if (config == null) {
+            logger.error("import information cannot be null");
             return null;
         }
 
         EntityManager em = null;
         try {
-            em = emf.getEntityManager( MANAGEMENT_APPLICATION_ID );
+            em = emf.getEntityManager(MANAGEMENT_APPLICATION_ID);
             Set<String> collections = em.getApplicationCollections();
-            if ( !collections.contains( "imports" ) ) {
-                em.createApplicationCollection( "imports" );
+            if (!collections.contains("imports")) {
+                em.createApplicationCollection("imports");
             }
-        }
-        catch ( Exception e ) {
-            logger.error( "application doesn't exist within the current context" );
+        } catch (Exception e) {
+            logger.error("application doesn't exist within the current context");
             return null;
         }
 
@@ -87,84 +85,42 @@ public class ImportServiceImpl implements ImportService {
 
         //update state
         try {
-            importUG = em.create( importUG );
-        }
-        catch ( Exception e ) {
-            logger.error( "Import entity creation failed" );
+            importUG = em.create(importUG);
+        } catch (Exception e) {
+            logger.error("Import entity creation failed");
             return null;
         }
 
-        importUG.setState( Import.State.CREATED );
-        em.update( importUG );
+        importUG.setState(Import.State.CREATED);
+        em.update(importUG);
 
         //set data to be transferred to exportInfo
         JobData jobData = new JobData();
-        jobData.setProperty( "importInfo", config );
-        jobData.setProperty( IMPORT_ID, importUG.getUuid() );
+        jobData.setProperty("importInfo", config);
+        jobData.setProperty(IMPORT_ID, importUG.getUuid());
 
         long soonestPossible = System.currentTimeMillis() + 250; //sch grace period
 
         //schedule job
-        sch.createJob( IMPORT_JOB_NAME, soonestPossible, jobData );
+        sch.createJob(IMPORT_JOB_NAME, soonestPossible, jobData);
 
         //update state
-        importUG.setState( Import.State.SCHEDULED );
-        em.update( importUG );
+        importUG.setState(Import.State.SCHEDULED);
+        em.update(importUG);
 
         return importUG.getUuid();
     }
 
-    /**
-     * Query Entity Manager for the string state of the Import Entity. This corresponds to the GET /import
-     *
-     * @return String
-     */
     @Override
-    public String getState(UUID uuid) throws Exception {
-        if ( uuid == null ) {
-            logger.error( "UUID passed in cannot be null." );
-            return "UUID passed in cannot be null";
-        }
-
-        EntityManager rootEm = emf.getEntityManager( MANAGEMENT_APPLICATION_ID );
-
-        //retrieve the import entity.
-        Import importUG = rootEm.get( uuid, Import.class );
-
-        if ( importUG == null ) {
-            logger.error( "no entity with that uuid was found" );
-            return "No Such Element found";
-        }
-        return importUG.getState().toString();
+    public String getState(UUID state) throws Exception {
+        return null;
     }
 
     @Override
-    public String getErrorMessage( final UUID appId, final UUID uuid ) throws Exception {
-
-        //get application entity manager
-        if ( appId == null ) {
-            logger.error( "Application context cannot be found." );
-            return "Application context cannot be found.";
-        }
-
-        if ( uuid == null ) {
-            logger.error( "UUID passed in cannot be null." );
-            return "UUID passed in cannot be null";
-        }
-
-        EntityManager rootEm = emf.getEntityManager( appId );
-
-        //retrieve the import entity.
-        Import importUG = rootEm.get( uuid, Import.class );
-
-        if ( importUG == null ) {
-            logger.error( "no entity with that uuid was found" );
-            return "No Such Element found";
-        }
-        return importUG.getState().toString();
+    public String getErrorMessage(UUID appId, UUID state) throws Exception {
+        return null;
     }
 
-    @Override
     public void doImport(JobExecution jobExecution) throws Exception {
 
         Map<String, Object> config = ( Map<String, Object> ) jobExecution.getJobData().getProperty( "importInfo" );
@@ -323,5 +279,4 @@ public class ImportServiceImpl implements ImportService {
 
         return inputFileName;
     }
-
 }
