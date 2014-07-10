@@ -1,11 +1,9 @@
 package org.apache.usergrid.management.cassandra;
 
-import org.apache.commons.io.FileUtils;
+import org.apache.usergrid.management.importUG.S3Import;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Map;
-import org.apache.usergrid.management.importUG.S3Import;
 
 /**
  * Created by ApigeeCorporation on 7/8/14.
@@ -20,13 +18,14 @@ public class MockS3ImportImpl implements S3Import{
     @Override
     public File copyFromS3(final Map<String,Object> exportInfo, String filename ) {
 
-        File verfiedData = new File( this.filename );
-        try {
-            FileUtils.copyFile(filename, verfiedData);
-        }
-        catch ( IOException e ) {
-            e.printStackTrace();
-        }
+//        File verfiedData = new File( this.filename );
+//        try {
+//            //FileUtils.copyFile(filename, verfiedData);
+//        }
+//        catch ( IOException e ) {
+//            e.printStackTrace();
+//        }
+          return new File("test");
     }
 
     @Override

@@ -173,7 +173,7 @@ public class ImportServiceImpl implements ImportService {
                 s3Import = ( S3Import ) s3PlaceHolder;
             }
             else {
-                s3Import = new S3ImportImpl();
+                s3Import =  new S3ImportImpl();
             }
         }
         catch ( Exception e ) {

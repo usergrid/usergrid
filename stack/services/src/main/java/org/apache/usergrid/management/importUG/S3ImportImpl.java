@@ -4,8 +4,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.Module;
 import org.jclouds.ContextBuilder;
 import org.jclouds.blobstore.BlobStore;
-import org.jclouds.blobstore.domain.Blob;
 import org.jclouds.blobstore.BlobStoreContext;
+import org.jclouds.blobstore.ContainerNotFoundException;
+import org.jclouds.blobstore.domain.Blob;
 import org.jclouds.http.config.JavaUrlHttpCommandExecutorServiceModule;
 import org.jclouds.logging.log4j.config.Log4JLoggingModule;
 import org.jclouds.netty.config.NettyPayloadModule;
@@ -13,15 +14,13 @@ import org.jclouds.netty.config.NettyPayloadModule;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import org.jclouds.blobstore.ContainerNotFoundException;
-import java.io.OutputStream;
 import java.util.Map;
 import java.util.Properties;
 
 /**
  * Created by ApigeeCorporation on 7/8/14.
  */
-public class S3ImportImpl {
+public class S3ImportImpl implements S3Import {
 
     public File copyFromS3( final Map<String,Object> exportInfo, String filename ) {
 
@@ -62,6 +61,11 @@ public class S3ImportImpl {
         }
         return ephemeral;
 
+    }
+
+    @Override
+    public String getFilename() {
+        return null;
     }
 
 }
