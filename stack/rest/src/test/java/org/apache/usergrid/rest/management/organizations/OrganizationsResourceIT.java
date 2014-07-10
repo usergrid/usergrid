@@ -24,6 +24,7 @@ import java.util.Set;
 
 import javax.ws.rs.core.MediaType;
 
+import org.apache.usergrid.security.shiro.credentials.OrganizationAccessToken;
 import org.codehaus.jackson.JsonNode;
 import org.junit.Test;
 import org.apache.usergrid.management.ApplicationInfo;
@@ -301,5 +302,45 @@ public class OrganizationsResourceIT extends AbstractRestIT {
         assertEquals( "test-user-2", username );
         assertEquals( "Test User 2", name );
         assertEquals( "test-user-2@mockserver.com", email );
+    }
+
+    @Test
+    public  void testGetOrganizationByIdForNull() {
+
+        JsonNode node;
+        String id = "11111111-1111-1111-1111-111111111111";
+        try {
+            node = resource().path("/management/organizations/" + id)
+                    .queryParam("access_token", superAdminToken())
+                    .accept(MediaType.APPLICATION_JSON)
+                    .type(MediaType.APPLICATION_JSON_TYPE)
+                    .get(JsonNode.class);
+        }
+        catch (UniformInterfaceException e)
+        {
+            node = e.getResponse().getEntity( JsonNode.class );
+            assertEquals( "Could not find organization for ID: " + id ,node.get( "error_description" ).getTextValue() );
+        }
+
+    }
+
+    @Test
+    public  void testGetOrganizationByNameForNull() {
+
+        JsonNode node;
+        String name = "testorg";
+        try {
+            node = resource().path("/management/organizations/" + name)
+                    .queryParam("access_token", superAdminToken())
+                    .accept(MediaType.APPLICATION_JSON)
+                    .type(MediaType.APPLICATION_JSON_TYPE)
+                    .get(JsonNode.class);
+        }
+        catch (UniformInterfaceException e)
+        {
+            node = e.getResponse().getEntity( JsonNode.class );
+            assertEquals( "Could not find organization for name: " + name ,node.get( "error_description" ).getTextValue() );
+        }
+
     }
 }
