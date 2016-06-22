@@ -51,7 +51,7 @@ The syntax for this Node module and the Javascript SDK are almost exactly the sa
 ##Installing
 Use npm:
 
-	$ npm install usergrid
+	$ npm install usergrid@0.10.11
 
 
 ##Getting started
